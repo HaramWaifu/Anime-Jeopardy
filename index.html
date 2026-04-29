@@ -924,7 +924,16 @@
 <!-- ═══════════════ UI (plain script, no module) ═══════════════ -->
 <script>
 var _currentRole = 'player';
-
+  
+function updateJoinBtn() {
+  var btn = document.getElementById('join-btn');
+  if (_currentRole === 'admin') {
+    btn.textContent = 'ROOM ERSTELLEN / BEITRETEN →';
+  } else {
+    btn.textContent = 'EINTRETEN →';
+  }
+}
+  
 document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('tab-player').addEventListener('click', function() {
     _currentRole = 'player';
@@ -945,7 +954,32 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   document.getElementById('join-btn').addEventListener('click', function() {
-    if (window._joinGame) window._joinGame(_currentRole);
+    var btn = document.getElementById('join-btn');
+    var errorEl = document.getElementById('lobby-error');
+
+    if (!window._joinGame) {
+      errorEl.textContent = 'App lädt noch, bitte kurz warten...';
+      setTimeout(function() {
+        if (window._joinGame) {
+          errorEl.textContent = '';
+          window._joinGame(_currentRole);
+        } else {
+          errorEl.textContent = 'Fehler: Firebase konnte nicht geladen werden. Seite neu laden!';
+        }
+      }, 1500);
+      return;
+    }
+
+    btn.textContent = 'Verbinde...';
+    btn.disabled = true;
+    window._joinGame(_currentRole).finally(function() {
+      btn.disabled = false;
+      document.getElementById('tab-admin').addEventListener('click', function() {
+    _currentRole = 'admin';
+    ...
+    updateJoinBtn();
+    });
+    });
   });
 });
 </script>
