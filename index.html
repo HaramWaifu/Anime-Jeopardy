@@ -1195,10 +1195,7 @@ function renderBoard(containerId, isAdmin) {
         if (isAdmin) {
           cell.onclick = () => openQuestionAdminAt(row, col);
         }
-      } if else (isAdmin) {
-          cell.onclick = () => showAnswer(row, col);
-        }
-
+      }
       container.appendChild(cell);
     }
   }
