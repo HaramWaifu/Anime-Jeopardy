@@ -1708,7 +1708,7 @@ async function saveEditorData() {
     }
 
     const answer = document.getElementById(`a_${row}_${col}`)?.value?.trim() || '';
-    questions[row].push({ text, answer, image, answered: ... });
+    questions[row].push({ text, answer, image, answered});
   }
 
   const newBoard = { categories, questions };
