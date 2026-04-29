@@ -1690,10 +1690,11 @@ function setupBuzzEnabledListener() {
 
 // Patch setupGame to also listen for buzz enabled
 const _origSetupGame = setupGame;
-function setupGame() {
+
+window.setupGame = function() {
   _origSetupGame();
   setupBuzzEnabledListener();
-}
+};
 
 // Expose for debug
 window._state = () => ({ myId, myName, roomCode, myRole, boardData });
