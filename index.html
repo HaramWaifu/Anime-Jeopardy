@@ -725,6 +725,18 @@
 
   .point-input-row input:focus { border-color: var(--gold); }
 
+  .board-cell.answered {
+  background: #0f5c2e;
+  border-color: #22cc66;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.board-cell.answered .cell-points {
+  opacity: 1;
+  color: #22cc66;
+}
+
   /* ─── CONFETTI (CSS) ─── */
   @keyframes confetti-fall {
     0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
@@ -919,6 +931,16 @@
   </div>
 </div>
 
+<div class="overlay" id="answer-overlay">
+  <div class="overlay-box">
+    <button class="close-btn" onclick="closeAnswer()">✕</button>
+    <div class="overlay-category" id="a-category"></div>
+    <div class="overlay-points" id="a-points"></div>
+    <div class="overlay-question" id="a-text"></div>
+    <div style="margin-top:1rem; font-weight:600; color:var(--success);" id="a-answer"></div>
+  </div>
+</div>
+
 <div class="notif" id="notif"></div>
 
 <!-- ═══════════════ UI (plain script, no module) ═══════════════ -->
@@ -1018,7 +1040,10 @@ let currentAdminQuestion = null;
 let listeners = [];
 
 const POINTS = [200, 400, 600, 800, 1000];
-
+  
+const buzzerSound = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
+let POINTS = [200, 400, 600, 800, 1000];
+  
 // Default board data
 const defaultBoard = {
   categories: ['Kategorie 1', 'Kategorie 2', 'Kategorie 3', 'Kategorie 4', 'Kategorie 5'],
@@ -1170,10 +1195,10 @@ function renderBoard(containerId, isAdmin) {
       if (!q.answered) {
         if (isAdmin) {
           cell.onclick = () => openQuestionAdminAt(row, col);
-        } else {
-          cell.onclick = () => openQuestion(row, col);
         }
-      }
+      } if else (isAdmin) {
+          cell.onclick = () => showAnswer(row, col);
+        }
 
       container.appendChild(cell);
     }
@@ -1201,6 +1226,37 @@ function openQuestion(row, col) {
   update(ref(db, `rooms/${roomCode}`), {
     activeQuestion: { row, col }
   });
+}
+
+function showAnswer(row, col) {
+  const q = boardData.questions[row][col];
+
+  document.getElementById('a-category').textContent = boardData.categories[col];
+  document.getElementById('a-points').textContent = POINTS[row] + ' Punkte';
+  document.getElementById('a-text').textContent = q.text;
+  document.getElementById('a-answer').textContent = q.answer || 'Keine Antwort hinterlegt';
+
+  document.getElementById('answer-overlay').classList.add('open');
+
+  // SYNC FÜR ALLE
+  update(ref(db, `rooms/${roomCode}`), {
+    showAnswer: { row, col }
+  });
+}
+
+function closeAnswer() {
+  document.getElementById('answer-overlay').classList.remove('open');
+}
+
+function listenGlobalOverlays() {
+  const r = ref(db, `rooms/${roomCode}/showAnswer`);
+  const off = onValue(r, snap => {
+    const data = snap.val();
+    if (data) {
+      showAnswer(data.row, data.col);
+    }
+  });
+  listeners.push(off);
 }
 
 window.openQuestion = openQuestion;
@@ -1246,6 +1302,7 @@ function listenBuzzer() {
       status.textContent = `${b.winnerName} buzzert!`;
       status.className = 'buzzer-status winner-status';
       btn.disabled = true;
+      buzzerSound.play().catch(()=>{});
 
       // Highlight winner chip
       document.querySelectorAll('.player-chip').forEach(c => {
@@ -1486,6 +1543,8 @@ async function markAnswered() {
   const { row, col } = currentAdminQuestion;
   const key = `${row}_${col}`;
   await update(ref(db, `rooms/${roomCode}/answered`), { [key]: true });
+
+  showAnswer(row, col);
   if (boardData.questions[row]?.[col]) boardData.questions[row][col].answered = true;
   closeAdminQuestion();
   await clearBuzzer();
@@ -1541,6 +1600,7 @@ async function resetGame() {
   if (!confirm('Wirklich das komplette Spiel zurücksetzen? Alle Punkte und Fortschritte werden gelöscht.')) return;
   await remove(ref(db, `rooms/${roomCode}/answered`));
   await clearBuzzer();
+  await set(ref(db, `rooms/${roomCode}/board`), defaultBoard);
   // Reset player scores
   const snap = await get(ref(db, `rooms/${roomCode}/players`));
   if (snap.exists()) {
@@ -1586,7 +1646,8 @@ function buildEditor() {
 
       card.innerHTML = `
         <div class="editor-points-label">${POINTS[row]}</div>
-        <textarea id="q_${row}_${col}" placeholder="Frage eingeben...">${q.text || ''}</textarea>
+        <textarea id="q_${row}_${col}" placeholder="Frage...">${q.text || ''}</textarea>
+        <textarea id="a_${row}_${col}" placeholder="Antwort..." style="min-height:40px;">${q.answer || ''}</textarea>
         <label class="img-upload-btn" id="img-label-${row}-${col}">
           ${hasImg ? '🖼 Bild ändern' : '+ Bild hinzufügen'}
           <input type="file" accept="image/*" onchange="handleImgUpload(event, ${row}, ${col})">
@@ -1649,6 +1710,9 @@ async function saveEditorData() {
       const image = editorImages[`${row}_${col}`] || null;
       questions[row].push({ text, image, answered: boardData?.questions?.[row]?.[col]?.answered || false });
     }
+
+    const answer = document.getElementById(`a_${row}_${col}`)?.value?.trim() || '';
+    questions[row].push({ text, answer, image, answered: ... });
   }
 
   const newBoard = { categories, questions };
@@ -1694,6 +1758,7 @@ const _origSetupGame = setupGame;
 window.setupGame = function() {
   _origSetupGame();
   setupBuzzEnabledListener();
+  listenGlobalOverlays();
 };
 
 // Expose for debug
