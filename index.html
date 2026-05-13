@@ -1083,6 +1083,7 @@
 <!-- ═══════════════ ANSWER OVERLAY (PLAYER) ═══════════════ -->
 <div class="overlay" id="answer-overlay">
   <div class="overlay-box" id="answer-overlay-box">
+    <button class="close-btn" id="answer-close-btn" onclick="closeAnswer()" style="display:none">✕</button>
     <div class="overlay-status-tag tag-answer">✓ Antwort</div>
     <div class="overlay-header">
       <div class="overlay-category" id="a-category"></div>
@@ -1227,7 +1228,113 @@ let listeners = [];
 
 const POINTS = [200, 400, 600, 800, 1000];
 
-const buzzerSound = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
+// ─── AUDIO ───
+// Buzzer sound via Web Audio API (no CORS issues, always works)
+let audioCtx = null;
+
+function getBuzzerCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playBuzzerSound() {
+  try {
+    const ctx = getBuzzerCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    // Short aggressive buzz tone
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(180, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.3);
+
+    gain.gain.setValueAtTime(0.6, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch(e) { /* silently fail if audio blocked */ }
+}
+
+// Lofi background music — HTML audio element, loop
+let lofiAudio = null;
+let lofiStarted = false;
+
+function setupLofi() {
+  if (lofiAudio) return;
+  lofiAudio = document.createElement('audio');
+  lofiAudio.loop = true;
+  lofiAudio.volume = 0.18;
+  // Public domain lofi track from archive.org
+  lofiAudio.src = 'https://archive.org/download/lofi-hip-hop-radio-beats-to-relax-study-to/01.mp3';
+  lofiAudio.preload = 'auto';
+  document.body.appendChild(lofiAudio);
+}
+
+function startLofi() {
+  if (lofiStarted) return;
+  if (!lofiAudio) setupLofi();
+  lofiAudio.play().then(() => {
+    lofiStarted = true;
+  }).catch(() => {
+    // Autoplay blocked — try on next user interaction
+  });
+}
+
+// Music toggle button (bottom right of game/admin screen)
+function addMusicToggle() {
+  const existing = document.getElementById('music-toggle');
+  if (existing) return;
+  const btn = document.createElement('button');
+  btn.id = 'music-toggle';
+  btn.textContent = '🎵';
+  btn.title = 'Musik an/aus';
+  btn.style.cssText = `
+    position: fixed; bottom: 1.2rem; left: 1.2rem;
+    width: 42px; height: 42px;
+    background: rgba(17,17,48,0.85);
+    border: 1px solid var(--cell-border);
+    border-radius: 50%;
+    color: var(--muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    z-index: 500;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    backdrop-filter: blur(4px);
+  `;
+  btn.onmouseenter = () => { btn.style.borderColor = 'var(--gold)'; btn.style.color = 'var(--gold)'; };
+  btn.onmouseleave = () => {
+    if (!lofiStarted || lofiAudio?.paused) {
+      btn.style.borderColor = 'var(--cell-border)'; btn.style.color = 'var(--muted)';
+    } else {
+      btn.style.borderColor = 'var(--success)'; btn.style.color = 'var(--success)';
+    }
+  };
+  btn.onclick = () => {
+    if (!lofiAudio) setupLofi();
+    if (lofiAudio.paused) {
+      lofiAudio.play().then(() => {
+        lofiStarted = true;
+        btn.textContent = '🎵';
+        btn.style.borderColor = 'var(--success)';
+        btn.style.color = 'var(--success)';
+      }).catch(() => {});
+    } else {
+      lofiAudio.pause();
+      btn.textContent = '🔇';
+      btn.style.borderColor = 'var(--cell-border)';
+      btn.style.color = 'var(--muted)';
+    }
+  };
+  document.body.appendChild(btn);
+}
+
+setupLofi();
 
 // Default board data
 const defaultBoard = {
@@ -1298,6 +1405,8 @@ async function joinGame(role) {
       boardData = snap.val().board || defaultBoard;
       showScreen('game');
       setupGame();
+      addMusicToggle();
+      startLofi();
 
     } else {
       roomCode = document.getElementById('admin-room').value.trim().toUpperCase();
@@ -1414,6 +1523,15 @@ function showAnsweredCell(row, col) {
   if (!q) return;
   populateAnswerOverlay(row, col);
   document.getElementById('answer-overlay').classList.add('open');
+
+  if (myRole === 'admin') {
+    // Admin gets close button
+    document.getElementById('answer-close-btn').style.display = '';
+    // Push to players so they see it too
+    update(ref(db, `rooms/${roomCode}`), { showAnswer: { row, col } });
+  } else {
+    document.getElementById('answer-close-btn').style.display = 'none';
+  }
 }
 
 // ─── OPEN QUESTION (PLAYER — triggered by Firebase) ───
@@ -1457,6 +1575,10 @@ function populateAnswerOverlay(row, col) {
 
 window.closeAnswer = function() {
   document.getElementById('answer-overlay').classList.remove('open');
+  // If admin closes, also close for players
+  if (myRole === 'admin' && db && roomCode) {
+    update(ref(db, `rooms/${roomCode}`), { showAnswer: null, closeOverlay: Date.now() });
+  }
 };
 
 // ─── LISTEN: ACTIVE QUESTION (PLAYER) ───
@@ -1485,12 +1607,13 @@ function listenShowAnswer() {
   const off = onValue(r, snap => {
     const data = snap.val();
     if (data && data.row !== undefined) {
-      // Close question overlay, open answer overlay with transition
       const qOverlay = document.getElementById('question-overlay');
       const aOverlay = document.getElementById('answer-overlay');
       const aBox = document.getElementById('answer-overlay-box');
 
       populateAnswerOverlay(data.row, data.col);
+      // Players never get close button — only admin
+      document.getElementById('answer-close-btn').style.display = 'none';
 
       if (qOverlay.classList.contains('open')) {
         const qBox = document.getElementById('question-overlay-box');
@@ -1505,6 +1628,9 @@ function listenShowAnswer() {
       } else {
         aOverlay.classList.add('open');
       }
+    } else {
+      // showAnswer cleared — close answer overlay for players
+      document.getElementById('answer-overlay').classList.remove('open');
     }
   });
   listeners.push(off);
@@ -1570,6 +1696,8 @@ function listenBuzzer() {
       banner.classList.add('active');
       status.textContent = `🔔 ${b.winnerName} buzzert!`;
       status.className = 'buzzer-status winner-status';
+
+      playBuzzerSound();
 
       // Lock both buzz buttons
       btn.classList.add('locked');
@@ -1733,6 +1861,8 @@ function listenAdminBuzzer() {
       winnerEl.textContent = b.winnerName;
       banner.classList.add('active');
       setTimeout(() => banner.classList.remove('active'), 3000);
+
+      playBuzzerSound();
 
       display.innerHTML = `
         <div class="buzz-active-banner">
