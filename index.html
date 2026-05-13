@@ -1074,6 +1074,9 @@
     <div class="overlay-question" id="q-text"></div>
     <img id="q-img" class="overlay-img" src="" alt="" style="display:none">
     <div class="overlay-buzz-indicator" id="q-buzz-indicator"></div>
+    <div class="overlay-actions" style="margin-top:1.5rem;">
+      <button class="buzz-btn" id="overlay-buzz-btn" onclick="buzz()" style="max-width:none; width:100%; font-size:1.3rem; padding:0.9rem 1.5rem;">⚡ BUZZERN</button>
+    </div>
   </div>
 </div>
 
@@ -1087,9 +1090,11 @@
     </div>
     <div class="overlay-divider"></div>
     <div class="overlay-question" id="a-text" style="color:var(--muted); font-size:1.1rem;"></div>
+    <img id="a-question-img" class="overlay-img" src="" alt="" style="display:none">
     <div class="overlay-answer-section">
       <div class="overlay-answer-label">Gesuchte Antwort</div>
       <div class="overlay-answer-text" id="a-answer"></div>
+      <img id="a-answer-img" class="overlay-img" src="" alt="" style="display:none; margin-top:0.8rem;">
     </div>
   </div>
 </div>
@@ -1114,10 +1119,12 @@
     <div class="overlay-answer-section" id="aq-answer-section" style="display:none">
       <div class="overlay-answer-label">Gesuchte Antwort</div>
       <div class="overlay-answer-text" id="aq-answer-text"></div>
+      <img id="aq-answer-img" class="overlay-img" src="" alt="" style="display:none; margin-top:0.8rem;">
     </div>
 
     <div class="admin-overlay-actions">
       <button class="btn btn-reveal btn-sm" onclick="revealAnswer()" id="aq-reveal-btn">🔍 Antwort aufdecken</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetBuzzer()">🔓 Buzzer freigeben</button>
       <button class="btn btn-success btn-sm" onclick="markAnswered()" id="aq-answered-btn">✓ Als beantwortet</button>
       <button class="btn btn-ghost btn-sm" onclick="closeAdminQuestion()">Schließen</button>
     </div>
@@ -1350,8 +1357,9 @@ function setupGame() {
   listenBuzzer();
   listenBoard();
   listenAnswered();
-  listenActiveQuestion();   // NEW: watch when admin opens a question
-  listenShowAnswer();       // NEW: watch when admin reveals answer
+  listenActiveQuestion();
+  listenShowAnswer();
+  listenCloseOverlay();   // NEW: close overlays when admin marks answered
 }
 
 // ─── BOARD RENDER ───
@@ -1435,6 +1443,16 @@ function populateAnswerOverlay(row, col) {
   document.getElementById('a-points').textContent = POINTS[row] + ' Punkte';
   document.getElementById('a-text').textContent = q.text;
   document.getElementById('a-answer').textContent = q.answer || 'Keine Antwort hinterlegt';
+
+  // Question image (shown above answer box)
+  const qImg = document.getElementById('a-question-img');
+  if (q.image) { qImg.src = q.image; qImg.style.display = 'block'; }
+  else { qImg.style.display = 'none'; }
+
+  // Answer image (shown inside answer box)
+  const aImg = document.getElementById('a-answer-img');
+  if (q.answerImage) { aImg.src = q.answerImage; aImg.style.display = 'block'; }
+  else { aImg.style.display = 'none'; }
 }
 
 window.closeAnswer = function() {
@@ -1492,11 +1510,21 @@ function listenShowAnswer() {
   listeners.push(off);
 }
 
-function closeQuestion() {
-  document.getElementById('question-overlay').classList.remove('open');
-  currentQuestion = null;
+// ─── LISTEN: CLOSE OVERLAYS (PLAYER) — triggered when admin marks answered ───
+function listenCloseOverlay() {
+  const r = ref(db, `rooms/${roomCode}/closeOverlay`);
+  const off = onValue(r, snap => {
+    if (snap.val()) {
+      document.getElementById('question-overlay').classList.remove('open');
+      document.getElementById('answer-overlay').classList.remove('open');
+      document.querySelectorAll('#board .question-cell').forEach(c => c.classList.remove('active-question'));
+      currentQuestion = null;
+    }
+  });
+  listeners.push(off);
 }
-window.closeQuestion = closeQuestion;
+
+
 
 // ─── BUZZER (PLAYER) ───
 // Players can ALWAYS buzz (the button is always visible).
@@ -1543,9 +1571,11 @@ function listenBuzzer() {
       status.textContent = `🔔 ${b.winnerName} buzzert!`;
       status.className = 'buzzer-status winner-status';
 
-      // Lock the buzzer button visually
+      // Lock both buzz buttons
       btn.classList.add('locked');
       btn.textContent = '🔒 GESPERRT';
+      const overlayBtn = document.getElementById('overlay-buzz-btn');
+      if (overlayBtn) { overlayBtn.classList.add('locked'); overlayBtn.textContent = '🔒 GESPERRT'; }
 
       // Highlight winner chip
       document.querySelectorAll('.player-chip').forEach(c => {
@@ -1564,9 +1594,11 @@ function listenBuzzer() {
       status.textContent = 'Bereit zum Buzzern!';
       status.className = 'buzzer-status ready-status';
 
-      // Unlock the button
+      // Unlock both buzz buttons
       btn.classList.remove('locked');
       btn.textContent = '⚡ BUZZERN';
+      const overlayBtn = document.getElementById('overlay-buzz-btn');
+      if (overlayBtn) { overlayBtn.classList.remove('locked'); overlayBtn.textContent = '⚡ BUZZERN'; }
 
       if (buzzIndicator) {
         buzzIndicator.textContent = '';
@@ -1778,6 +1810,9 @@ function openQuestionAdminAt(row, col) {
 
   // Store answer for reveal
   document.getElementById('aq-answer-text').textContent = q.answer || 'Keine Antwort hinterlegt';
+  const aqAnsImg = document.getElementById('aq-answer-img');
+  if (q.answerImage) { aqAnsImg.src = q.answerImage; aqAnsImg.style.display = 'block'; }
+  else { aqAnsImg.style.display = 'none'; }
   document.getElementById('aq-answer-section').style.display = 'none';
   document.getElementById('aq-reveal-btn').style.display = '';
   document.getElementById('aq-status-tag').className = 'overlay-status-tag tag-open';
@@ -1842,13 +1877,18 @@ async function markAnswered() {
 
   if (boardData.questions[row]?.[col]) boardData.questions[row][col].answered = true;
 
-  closeAdminQuestion();
+  // Close admin overlay
+  document.getElementById('admin-question-overlay').classList.remove('open');
+  document.querySelectorAll('#admin-board .question-cell').forEach(c => c.classList.remove('active-question'));
+  currentAdminQuestion = null;
+
   await clearBuzzer();
 
-  // Clear active question / show answer pointers
+  // Tell players to close their overlays (question + answer)
   update(ref(db, `rooms/${roomCode}`), {
     activeQuestion: null,
-    showAnswer: null
+    showAnswer: null,
+    closeOverlay: Date.now()   // timestamp forces re-trigger even if value was already null
   });
 }
 window.markAnswered = markAnswered;
@@ -1946,23 +1986,31 @@ function buildEditor() {
       card.className = 'editor-q-card';
 
       const imgKey = `${row}_${col}`;
+      const ansImgKey = `ans_${row}_${col}`;
       const hasImg = editorImages[imgKey] || q.image;
+      const hasAnsImg = editorImages[ansImgKey] || q.answerImage;
 
       card.innerHTML = `
         <div class="editor-points-label">${POINTS[row]}</div>
         <span class="editor-field-label">Frage</span>
         <textarea id="q_${row}_${col}" placeholder="Frage...">${q.text || ''}</textarea>
-        <span class="editor-field-label" style="color:var(--success);">Antwort</span>
-        <textarea id="a_${row}_${col}" class="editor-answer-input" placeholder="Antwort...">${q.answer || ''}</textarea>
         <label class="img-upload-btn" id="img-label-${row}-${col}">
-          ${hasImg ? '🖼 Bild ändern' : '+ Bild hinzufügen'}
-          <input type="file" accept="image/*" onchange="handleImgUpload(event, ${row}, ${col})">
+          ${hasImg ? '🖼 Fragenbild ändern' : '+ Fragenbild hinzufügen'}
+          <input type="file" accept="image/*" onchange="handleImgUpload(event, ${row}, ${col}, false)">
         </label>
         ${hasImg ? `<img class="img-preview" id="img-prev-${row}-${col}" src="${editorImages[imgKey] || q.image}">` : `<div id="img-prev-${row}-${col}"></div>`}
+        <span class="editor-field-label" style="color:var(--success); margin-top:0.3rem;">Antwort</span>
+        <textarea id="a_${row}_${col}" class="editor-answer-input" placeholder="Antwort...">${q.answer || ''}</textarea>
+        <label class="img-upload-btn" id="ans-img-label-${row}-${col}" style="border-color:rgba(34,204,102,0.3); color:var(--success);">
+          ${hasAnsImg ? '🖼 Antwortbild ändern' : '+ Antwortbild hinzufügen'}
+          <input type="file" accept="image/*" onchange="handleImgUpload(event, ${row}, ${col}, true)">
+        </label>
+        ${hasAnsImg ? `<img class="img-preview" id="ans-img-prev-${row}-${col}" src="${editorImages[ansImgKey] || q.answerImage}">` : `<div id="ans-img-prev-${row}-${col}"></div>`}
       `;
       grid.appendChild(card);
 
       if (q.image && !editorImages[imgKey]) editorImages[imgKey] = q.image;
+      if (q.answerImage && !editorImages[ansImgKey]) editorImages[ansImgKey] = q.answerImage;
     }
   }
 }
@@ -1972,19 +2020,23 @@ window.loadEditorData = function() {
   buildEditor();
 };
 
-window.handleImgUpload = function(event, row, col) {
+window.handleImgUpload = function(event, row, col, isAnswer) {
   const file = event.target.files[0];
   if (!file) return;
-  if (file.size > 500000) {
-    showNotif('Bild zu groß! Bitte unter 500KB verwenden.', 4000);
+  if (file.size > 10485760) {
+    showNotif('Bild zu groß! Bitte unter 10 MB verwenden.', 4000);
     return;
   }
   const reader = new FileReader();
   reader.onload = e => {
-    const key = `${row}_${col}`;
+    const key = isAnswer ? `ans_${row}_${col}` : `${row}_${col}`;
+    const prevId = isAnswer ? `ans-img-prev-${row}-${col}` : `img-prev-${row}-${col}`;
+    const labelId = isAnswer ? `ans-img-label-${row}-${col}` : `img-label-${row}-${col}`;
+    const labelText = isAnswer ? '🖼 Antwortbild ändern' : '🖼 Fragenbild ändern';
+
     editorImages[key] = e.target.result;
-    const prev = document.getElementById(`img-prev-${row}-${col}`);
-    const label = document.getElementById(`img-label-${row}-${col}`);
+    const prev = document.getElementById(prevId);
+    const label = document.getElementById(labelId);
     if (prev) {
       if (prev.tagName === 'IMG') {
         prev.src = e.target.result;
@@ -1993,10 +2045,10 @@ window.handleImgUpload = function(event, row, col) {
         img.className = 'img-preview';
         img.src = e.target.result;
         prev.replaceWith(img);
-        img.id = `img-prev-${row}-${col}`;
+        img.id = prevId;
       }
     }
-    if (label) label.childNodes[0].textContent = '🖼 Bild ändern';
+    if (label) label.childNodes[0].textContent = labelText;
   };
   reader.readAsDataURL(file);
 };
@@ -2014,9 +2066,10 @@ async function saveEditorData() {
       const text = document.getElementById(`q_${row}_${col}`)?.value?.trim() || '';
       const answer = document.getElementById(`a_${row}_${col}`)?.value?.trim() || '';
       const image = editorImages[`${row}_${col}`] || null;
+      const answerImage = editorImages[`ans_${row}_${col}`] || null;
       // Preserve answered state
       const wasAnswered = boardData?.questions?.[row]?.[col]?.answered || false;
-      questions[row].push({ text, answer, image, answered: wasAnswered });
+      questions[row].push({ text, answer, image, answerImage, answered: wasAnswered });
     }
   }
 
