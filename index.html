@@ -974,7 +974,7 @@
   </div>
 
   <div class="bottom-bar">
-    <div style="font-size:0.9rem; color:var(--muted);">
+    <div style="font-size:0.9rem; color:var(--muted); padding-left: 52px;">
       Spieler: <strong id="my-name-display" style="color:var(--gold)"></strong>
     </div>
     <!-- Buzzer is always enabled for players (disabled state handled via locked class) -->
@@ -1229,107 +1229,143 @@ let listeners = [];
 const POINTS = [200, 400, 600, 800, 1000];
 
 // ─── AUDIO ───
-// Buzzer sound via Web Audio API (no CORS issues, always works)
+// Web Audio API context — shared
 let audioCtx = null;
-
-function getBuzzerCtx() {
+function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
 
+// ── Buzzer Sound ──
+// Classic game-show buzzer: short harsh square wave + low sub thump
 function playBuzzerSound() {
   try {
-    const ctx = getBuzzerCtx();
-    if (ctx.state === 'suspended') ctx.resume();
+    const ctx = getAudioCtx();
+    const t = ctx.currentTime;
 
-    // Short aggressive buzz tone
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    // Main buzz — square wave, descending pitch
+    const osc1 = ctx.createOscillator();
+    const g1 = ctx.createGain();
+    osc1.type = 'square';
+    osc1.frequency.setValueAtTime(440, t);
+    osc1.frequency.linearRampToValueAtTime(120, t + 0.18);
+    g1.gain.setValueAtTime(0.55, t);
+    g1.gain.linearRampToValueAtTime(0.0, t + 0.22);
+    osc1.connect(g1); g1.connect(ctx.destination);
+    osc1.start(t); osc1.stop(t + 0.22);
 
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(180, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.3);
+    // Sub thump — sine, very short
+    const osc2 = ctx.createOscillator();
+    const g2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(90, t);
+    osc2.frequency.linearRampToValueAtTime(40, t + 0.12);
+    g2.gain.setValueAtTime(0.7, t);
+    g2.gain.linearRampToValueAtTime(0.0, t + 0.14);
+    osc2.connect(g2); g2.connect(ctx.destination);
+    osc2.start(t); osc2.stop(t + 0.14);
 
-    gain.gain.setValueAtTime(0.6, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.4);
-  } catch(e) { /* silently fail if audio blocked */ }
+    // Distortion layer for harshness
+    const osc3 = ctx.createOscillator();
+    const g3 = ctx.createGain();
+    osc3.type = 'sawtooth';
+    osc3.frequency.setValueAtTime(220, t);
+    osc3.frequency.linearRampToValueAtTime(80, t + 0.2);
+    g3.gain.setValueAtTime(0.25, t);
+    g3.gain.linearRampToValueAtTime(0.0, t + 0.2);
+    osc3.connect(g3); g3.connect(ctx.destination);
+    osc3.start(t); osc3.stop(t + 0.2);
+  } catch(e) {}
 }
 
-// Lofi background music — HTML audio element, loop
+// ── Lofi Background Music ──
+// Using a reliable CORS-friendly public MP3 from Wikimedia / pixabay CDN
+const LOFI_TRACKS = [
+  'https://upload.wikimedia.org/wikipedia/commons/4/4e/BWV_543-fugue.ogg',  // fallback classical
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'           // primary
+];
+
 let lofiAudio = null;
-let lofiStarted = false;
+let lofiMuted = false;
 
 function setupLofi() {
   if (lofiAudio) return;
   lofiAudio = document.createElement('audio');
   lofiAudio.loop = true;
-  lofiAudio.volume = 0.18;
-  // Public domain lofi track from archive.org
-  lofiAudio.src = 'https://archive.org/download/lofi-hip-hop-radio-beats-to-relax-study-to/01.mp3';
+  lofiAudio.volume = 0.09;   // quiet — not intrusive
+  lofiAudio.crossOrigin = 'anonymous';
   lofiAudio.preload = 'auto';
+
+  // Try primary track, fallback on error
+  lofiAudio.src = LOFI_TRACKS[1];
+  lofiAudio.onerror = () => {
+    if (lofiAudio.src !== LOFI_TRACKS[0]) {
+      lofiAudio.src = LOFI_TRACKS[0];
+      lofiAudio.load();
+      if (!lofiMuted) lofiAudio.play().catch(()=>{});
+    }
+  };
   document.body.appendChild(lofiAudio);
 }
 
 function startLofi() {
-  if (lofiStarted) return;
   if (!lofiAudio) setupLofi();
-  lofiAudio.play().then(() => {
-    lofiStarted = true;
-  }).catch(() => {
-    // Autoplay blocked — try on next user interaction
+  lofiMuted = false;
+  lofiAudio.muted = false;
+  lofiAudio.play().catch(() => {
+    // Autoplay blocked — music button will start it on first click
   });
 }
 
-// Music toggle button (bottom right of game/admin screen)
+function updateMusicBtn() {
+  const btn = document.getElementById('music-toggle');
+  if (!btn) return;
+  if (lofiMuted) {
+    btn.textContent = '🔇';
+    btn.style.borderColor = 'var(--cell-border)';
+    btn.style.color = 'var(--muted)';
+  } else {
+    btn.textContent = '🎵';
+    btn.style.borderColor = 'var(--success)';
+    btn.style.color = 'var(--success)';
+  }
+}
+
 function addMusicToggle() {
-  const existing = document.getElementById('music-toggle');
-  if (existing) return;
+  if (document.getElementById('music-toggle')) return;
   const btn = document.createElement('button');
   btn.id = 'music-toggle';
   btn.textContent = '🎵';
   btn.title = 'Musik an/aus';
   btn.style.cssText = `
-    position: fixed; bottom: 1.2rem; left: 1.2rem;
-    width: 42px; height: 42px;
-    background: rgba(17,17,48,0.85);
-    border: 1px solid var(--cell-border);
+    position: fixed; bottom: 1.1rem; left: 1.1rem;
+    width: 40px; height: 40px;
+    background: rgba(14,14,50,0.9);
+    border: 1px solid var(--success);
     border-radius: 50%;
-    color: var(--muted);
-    font-size: 1.1rem;
+    color: var(--success);
+    font-size: 1rem;
     cursor: pointer;
     z-index: 500;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.2s;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(6px);
   `;
-  btn.onmouseenter = () => { btn.style.borderColor = 'var(--gold)'; btn.style.color = 'var(--gold)'; };
-  btn.onmouseleave = () => {
-    if (!lofiStarted || lofiAudio?.paused) {
-      btn.style.borderColor = 'var(--cell-border)'; btn.style.color = 'var(--muted)';
-    } else {
-      btn.style.borderColor = 'var(--success)'; btn.style.color = 'var(--success)';
-    }
-  };
   btn.onclick = () => {
     if (!lofiAudio) setupLofi();
-    if (lofiAudio.paused) {
-      lofiAudio.play().then(() => {
-        lofiStarted = true;
-        btn.textContent = '🎵';
-        btn.style.borderColor = 'var(--success)';
-        btn.style.color = 'var(--success)';
-      }).catch(() => {});
+    if (lofiMuted) {
+      // Un-mute
+      lofiMuted = false;
+      lofiAudio.muted = false;
+      // If it was never started yet (autoplay blocked), start it now
+      if (lofiAudio.paused) lofiAudio.play().catch(()=>{});
     } else {
-      lofiAudio.pause();
-      btn.textContent = '🔇';
-      btn.style.borderColor = 'var(--cell-border)';
-      btn.style.color = 'var(--muted)';
+      // Mute — keep playing, just silence it
+      lofiMuted = true;
+      lofiAudio.muted = true;
     }
+    updateMusicBtn();
   };
   document.body.appendChild(btn);
 }
@@ -1407,6 +1443,7 @@ async function joinGame(role) {
       setupGame();
       addMusicToggle();
       startLofi();
+      setTimeout(updateMusicBtn, 300); // update button after play attempt
 
     } else {
       roomCode = document.getElementById('admin-room').value.trim().toUpperCase();
@@ -1436,6 +1473,9 @@ async function joinGame(role) {
       boardData = snap.exists() ? (snap.val().board || defaultBoard) : defaultBoard;
       showScreen('admin-panel');
       setupAdmin();
+      addMusicToggle();
+      startLofi();
+      setTimeout(updateMusicBtn, 300);
     }
   } catch(e) {
     showError('Verbindungsfehler: ' + e.message);
