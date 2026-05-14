@@ -1282,8 +1282,7 @@ function playBuzzerSound() {
 // ── Lofi Background Music ──
 // Using a reliable CORS-friendly public MP3 from Wikimedia / pixabay CDN
 const LOFI_TRACKS = [
-  //'https://upload.wikimedia.org/wikipedia/commons/4/4e/BWV_543-fugue.ogg',  // fallback classical
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'           // primary
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
 ];
 
 let lofiAudio = null;
@@ -1298,10 +1297,10 @@ function setupLofi() {
   lofiAudio.preload = 'auto';
 
   // Try primary track, fallback on error
-  lofiAudio.src = LOFI_TRACKS[1];
+  lofiAudio.src = LOFI_TRACKS[0];
   lofiAudio.onerror = () => {
     if (lofiAudio.src !== LOFI_TRACKS[0]) {
-      lofiAudio.src = LOFI_TRACKS[1];
+      lofiAudio.src = LOFI_TRACKS[0];
       lofiAudio.load();
       if (!lofiMuted) lofiAudio.play().catch(()=>{});
     }
