@@ -1301,7 +1301,7 @@ function setupLofi() {
   lofiAudio.src = LOFI_TRACKS[1];
   lofiAudio.onerror = () => {
     if (lofiAudio.src !== LOFI_TRACKS[0]) {
-      lofiAudio.src = LOFI_TRACKS[0];
+      lofiAudio.src = LOFI_TRACKS[1];
       lofiAudio.load();
       if (!lofiMuted) lofiAudio.play().catch(()=>{});
     }
