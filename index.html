@@ -1231,7 +1231,8 @@ const POINTS = [200, 400, 600, 800, 1000];
 // ─── AUDIO ───
 
 // ── Buzzer Sound (Base64 WAV — kein externes Hosting, kein CORS) ──
-const buzzerSound = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
+const buzzerSound = new Audio("https://pixabay.com/sound-effects/film-special-effects-buzzer2-6109/");
+//const buzzerSound = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
 buzzerSound.volume = 0.85;
 
 function playBuzzerSound() {
@@ -1239,7 +1240,8 @@ function playBuzzerSound() {
     buzzerSound.currentTime = 0;
     buzzerSound.play().catch(() => {
       // Fallback: neues Audio-Objekt bei Autoplay-Block
-      const a = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
+      const a = new Audio("https://pixabay.com/sound-effects/film-special-effects-buzzer2-6109/");
+      //const a = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
       a.volume = 0.85;
       a.play().catch(() => {});
     });
