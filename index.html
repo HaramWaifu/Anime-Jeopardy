@@ -1243,21 +1243,6 @@ function setupBuzzer() {
   buzzerAudio.load();
 }
 
-function unlockAudio() {
-  setupBuzzer();
-  setupLofi();
-
-  if (lofiAudio && lofiAudio.paused) {
-    lofiAudio.play().catch(() => {});
-  }
-
-  document.removeEventListener('click', unlockAudio);
-  document.removeEventListener('touchstart', unlockAudio);
-}
-
-document.addEventListener('click', unlockAudio, { once: true });
-document.addEventListener('touchstart', unlockAudio, { once: true });
-
 function playBuzzerSound() {
   try {
     setupBuzzer();
@@ -1276,8 +1261,9 @@ function playBuzzerSound() {
   }
 }
 
-// ── Lofi Background Music (loops) ──
+// ── Lofi Background Music ──
 const LOFI_URL = 'https://archive.org/download/lofi-hip-hop-radio-beats-to-relax-study-to/01.mp3';
+
 let lofiAudio = null;
 let lofiMuted = false;
 
@@ -1305,6 +1291,22 @@ function startLofi() {
     });
   }
 }
+
+// Audio unlock for browser autoplay protection
+function unlockAudio() {
+  setupBuzzer();
+  setupLofi();
+
+  if (lofiAudio && lofiAudio.paused) {
+    lofiAudio.play().catch(() => {});
+  }
+
+  document.removeEventListener('click', unlockAudio);
+  document.removeEventListener('touchstart', unlockAudio);
+}
+
+document.addEventListener('click', unlockAudio, { once: true });
+document.addEventListener('touchstart', unlockAudio, { once: true });
 
 function updateMusicBtn() {
   const btn = document.getElementById('music-toggle');
