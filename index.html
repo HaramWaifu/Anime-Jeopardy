@@ -1231,24 +1231,24 @@ const POINTS = [200, 400, 600, 800, 1000];
 // ─── AUDIO ───
 // Both sounds are embedded as base64 WAV — no external URLs, always works
 
-// ── Buzzer Sound (embedded WAV) ──
-const BUZZER_B64 = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3")
+// ── Buzzer Sound ──
+const BUZZER_URL = "https://www.soundjay.com/buttons/sounds/button-09.mp3";
 function playBuzzerSound() {
   try {
-    const audio = new Audio(BUZZER_B64);
+    const audio = new Audio(BUZZER_URL);
     audio.volume = 0.85;
     audio.play().catch(()=>{});
   } catch(e) {}
 }
 
-// ── Lofi Background Music (embedded WAV, loops) ──
-const LOFI_B64 = new Audio('https://archive.org/download/lofi-hip-hop-radio-beats-to-relax-study-to/01.mp3')
+// ── Lofi Background Music (loops) ──
+const LOFI_URL = 'https://archive.org/download/lofi-hip-hop-radio-beats-to-relax-study-to/01.mp3';
 let lofiAudio = null;
 let lofiMuted = false;
 
 function setupLofi() {
   if (lofiAudio) return;
-  lofiAudio = new Audio(LOFI_B64);
+  lofiAudio = new Audio(LOFI_URL);
   lofiAudio.loop = true;
   lofiAudio.volume = 0.09;
   document.body.appendChild(lofiAudio);
