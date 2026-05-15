@@ -1230,22 +1230,32 @@ const POINTS = [200, 400, 600, 800, 1000];
 
 // ─── AUDIO ───
 
-// ── Buzzer Sound (Base64 WAV — kein externes Hosting, kein CORS) ──
-//const buzzerSound = new Audio("https://pixabay.com/sound-effects/film-special-effects-buzzer2-6109/");
-const buzzerSound = new Audio("https://www.soundjay.com/buttons/sounds/button-42.mp3");
-buzzerSound.volume = 0.85;
-
+// ── Buzzer Sound (Web Audio API — kein externes Hosting, kein CORS) ──
+let audioCtx;
 function playBuzzerSound() {
   try {
-    buzzerSound.currentTime = 0;
-    buzzerSound.play().catch(() => {
-      // Fallback: neues Audio-Objekt bei Autoplay-Block
-      //const a = new Audio("https://pixabay.com/sound-effects/film-special-effects-buzzer2-6109/");
-      const a = new Audio("https://www.soundjay.com/buttons/sounds/button-42.mp3");
-      a.volume = 0.85;
-      a.play().catch(() => {});
-    });
-  } catch(e) {}
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // AudioContext nach User-Interaktion ggf. wieder aufwecken
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    // "Game show buzzer" sound
+    osc.type = "square";
+    osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    // kurzer "buzz"
+    setTimeout(() => {
+      osc.stop();
+    }, 180);
+  } catch (e) {
+    console.log("Buzzer error:", e);
+  }
 }
 
 // ── Lofi Background Music: procedurally generated loop ──
