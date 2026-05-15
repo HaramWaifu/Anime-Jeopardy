@@ -1228,83 +1228,81 @@ let listeners = [];
 
 const POINTS = [200, 400, 600, 800, 1000];
 
-// ─── AUDIO (Web Audio API — no external URLs, no CORS issues) ───
-let _audioCtx = null;
-function getAudioCtx() {
-  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (_audioCtx.state === 'suspended') _audioCtx.resume();
-  return _audioCtx;
+// ─── AUDIO ───
+
+// ── Buzzer Sound ──
+const BUZZER_URL = "https://www.soundjay.com/buttons/sounds/button-09.mp3";
+let buzzerAudio = null;
+
+function setupBuzzer() {
+  if (buzzerAudio) return;
+
+  buzzerAudio = new Audio(BUZZER_URL);
+  buzzerAudio.preload = "auto";
+  buzzerAudio.volume = 0.85;
+  buzzerAudio.load();
 }
 
-// ── Buzzer Sound: sharp descending buzz ──
+function unlockAudio() {
+  setupBuzzer();
+  setupLofi();
+
+  if (lofiAudio && lofiAudio.paused) {
+    lofiAudio.play().catch(() => {});
+  }
+
+  document.removeEventListener('click', unlockAudio);
+  document.removeEventListener('touchstart', unlockAudio);
+}
+
+document.addEventListener('click', unlockAudio, { once: true });
+document.addEventListener('touchstart', unlockAudio, { once: true });
+
 function playBuzzerSound() {
   try {
-    const ctx = getAudioCtx();
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0.7, ctx.currentTime);
-    master.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-    master.connect(ctx.destination);
+    setupBuzzer();
 
-    // Two oscillators for a harsh buzz effect
-    [80, 160].forEach(freq => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.5, ctx.currentTime + 0.5);
-      osc.connect(master);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.6);
-    });
-  } catch(e) {}
+    buzzerAudio.currentTime = 0;
+
+    const playPromise = buzzerAudio.play();
+
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.log("Buzzer blocked:", err);
+      });
+    }
+  } catch(e) {
+    console.error("Buzzer error:", e);
+  }
 }
 
-// ── Lofi Background Music: procedurally generated loop ──
+// ── Lofi Background Music (loops) ──
+const LOFI_URL = 'https://archive.org/download/lofi-hip-hop-radio-beats-to-relax-study-to/01.mp3';
+let lofiAudio = null;
 let lofiMuted = false;
-let lofiGain = null;
-let lofiCtx = null;
-let lofiInterval = null;
-
-const LOFI_NOTES = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]; // C major
-
-function playLofiNote(ctx, master) {
-  const note = LOFI_NOTES[Math.floor(Math.random() * LOFI_NOTES.length)];
-  const octave = Math.random() > 0.5 ? 1 : 0.5;
-  const when = ctx.currentTime;
-  const duration = 0.4 + Math.random() * 0.6;
-
-  const osc = ctx.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.value = note * octave;
-
-  const env = ctx.createGain();
-  env.gain.setValueAtTime(0, when);
-  env.gain.linearRampToValueAtTime(0.18, when + 0.05);
-  env.gain.exponentialRampToValueAtTime(0.001, when + duration);
-
-  osc.connect(env);
-  env.connect(master);
-  osc.start(when);
-  osc.stop(when + duration + 0.1);
-}
 
 function setupLofi() {
-  if (lofiCtx) return;
-  lofiCtx = new (window.AudioContext || window.webkitAudioContext)();
-  lofiGain = lofiCtx.createGain();
-  lofiGain.gain.value = 0.4;
-  lofiGain.connect(lofiCtx.destination);
+  if (lofiAudio) return;
+
+  lofiAudio = new Audio(LOFI_URL);
+  lofiAudio.preload = "auto";
+  lofiAudio.loop = true;
+  lofiAudio.volume = 0.09;
+  lofiAudio.load();
 }
 
 function startLofi() {
-  setupLofi();
-  if (lofiCtx.state === 'suspended') lofiCtx.resume();
+  if (!lofiAudio) setupLofi();
+
   lofiMuted = false;
-  lofiGain.gain.value = 0.4;
-  if (!lofiInterval) {
-    playLofiNote(lofiCtx, lofiGain);
-    lofiInterval = setInterval(() => {
-      if (!lofiMuted) playLofiNote(lofiCtx, lofiGain);
-    }, 500 + Math.random() * 300);
+  lofiAudio.muted = false;
+
+  const playPromise = lofiAudio.play();
+
+  if (playPromise !== undefined) {
+    playPromise.catch(() => {
+      console.log("Lofi autoplay blocked until user interaction");
+    });
   }
 }
 
@@ -1343,18 +1341,17 @@ function addMusicToggle() {
     backdrop-filter: blur(6px);
   `;
   btn.onclick = () => {
-    if (!lofiCtx) {
-      startLofi();
-      updateMusicBtn();
-      return;
-    }
+    if (!lofiAudio) setupLofi();
     if (lofiMuted) {
+      // Un-mute
       lofiMuted = false;
-      lofiGain.gain.value = 0.4;
-      if (lofiCtx.state === 'suspended') lofiCtx.resume();
+      lofiAudio.muted = false;
+      // If it was never started yet (autoplay blocked), start it now
+      if (lofiAudio.paused) lofiAudio.play().catch(()=>{});
     } else {
+      // Mute — keep playing, just silence it
       lofiMuted = true;
-      lofiGain.gain.value = 0;
+      lofiAudio.muted = true;
     }
     updateMusicBtn();
   };
