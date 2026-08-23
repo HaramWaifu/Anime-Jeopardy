@@ -1,0 +1,2422 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jeopardy — Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a1a;
+    --board-bg: #06061a;
+    --gold: #f5c518;
+    --gold-dark: #c49a0e;
+    --blue: #1a1aff;
+    --blue-mid: #1111aa;
+    --blue-dark: #080855;
+    --blue-card: #0e0e66;
+    --cell-border: #2a2ab0;
+    --text: #ffffff;
+    --muted: #aaaacc;
+    --danger: #ff4455;
+    --success: #22cc66;
+    --buzz-color: #ff6600;
+    --panel-bg: #111130;
+    --input-bg: #1a1a3a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── SCREENS ─── */
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ─── LOBBY ─── */
+  #lobby {
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 0%, #1a1a6a 0%, var(--bg) 70%);
+  }
+
+  .lobby-box {
+    background: var(--panel-bg);
+    border: 1px solid var(--cell-border);
+    border-radius: 16px;
+    padding: 2.5rem 3rem;
+    width: min(480px, 92vw);
+    text-align: center;
+  }
+
+  .logo {
+    font-family: 'Anton', sans-serif;
+    font-size: 3.5rem;
+    color: var(--gold);
+    letter-spacing: 4px;
+    text-shadow: 0 0 40px rgba(245,197,24,0.4);
+    margin-bottom: 0.25rem;
+  }
+
+  .logo-sub {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1rem;
+    color: var(--muted);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-bottom: 2rem;
+  }
+
+  .role-tabs {
+    display: flex;
+    border: 1px solid var(--cell-border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .role-tab {
+    flex: 1;
+    padding: 0.7rem;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .role-tab.active {
+    background: var(--gold);
+    color: #000;
+  }
+
+  .form-group { margin-bottom: 1.2rem; text-align: left; }
+
+  .form-group label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--input-bg);
+    border: 1px solid var(--cell-border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus { border-color: var(--gold); }
+
+  .btn {
+    display: inline-block;
+    padding: 0.85rem 2rem;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--gold); color: #000; width: 100%; }
+  .btn-primary:hover { background: #ffd740; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #ff2235; }
+  .btn-success { background: var(--success); color: #000; }
+  .btn-success:hover { background: #11ee55; }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--cell-border);
+    color: var(--muted);
+  }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-sm { padding: 0.5rem 1.2rem; font-size: 0.9rem; }
+
+  .error-msg {
+    color: var(--danger);
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    min-height: 1.2rem;
+  }
+
+  /* ─── GAME LAYOUT ─── */
+  #game {
+    flex-direction: column;
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1.2rem;
+    background: var(--blue-dark);
+    border-bottom: 2px solid var(--gold);
+    flex-shrink: 0;
+  }
+
+  .top-bar-title {
+    font-family: 'Anton', sans-serif;
+    font-size: 1.4rem;
+    color: var(--gold);
+    letter-spacing: 3px;
+  }
+
+  .players-bar {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .player-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--blue-card);
+    border: 1px solid var(--cell-border);
+    border-radius: 8px;
+    padding: 0.3rem 0.8rem;
+    min-width: 90px;
+  }
+
+  .player-chip .p-name {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .player-chip .p-score {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--gold);
+  }
+
+  .player-chip.buzzer-winner {
+    border-color: var(--buzz-color);
+    box-shadow: 0 0 12px rgba(255,102,0,0.5);
+  }
+
+  .player-chip.buzzer-winner .p-name {
+    color: var(--buzz-color);
+  }
+
+  /* ─── BOARD ─── */
+  .board-wrap {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 1rem;
+    overflow: auto;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    width: min(1100px, 100%);
+  }
+
+  .board-cell {
+    background: var(--blue-card);
+    border: 2px solid var(--cell-border);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.5rem;
+    min-height: 90px;
+    cursor: default;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .board-cell.category-cell {
+    background: var(--blue-mid);
+    border-color: var(--blue);
+    min-height: 70px;
+    cursor: default;
+  }
+
+  .board-cell.category-cell span {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    line-height: 1.2;
+  }
+
+  .board-cell.question-cell {
+    cursor: default; /* Players can't click */
+  }
+
+  /* Admin board cells are clickable */
+  #admin-board .board-cell.question-cell:not(.answered) {
+    cursor: pointer;
+  }
+  #admin-board .board-cell.question-cell:not(.answered):hover {
+    border-color: var(--gold);
+    background: #141480;
+  }
+
+  .board-cell.question-cell .cell-points {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--gold);
+    text-shadow: 0 2px 8px rgba(245,197,24,0.4);
+  }
+
+  .board-cell.answered {
+    background: #0f5c2e;
+    border-color: #22cc66;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .board-cell.answered .cell-points {
+    opacity: 1;
+    color: #22cc66;
+  }
+
+  /* ─── BOTTOM BAR ─── */
+  .bottom-bar {
+    padding: 0.8rem 1.5rem;
+    background: var(--panel-bg);
+    border-top: 1px solid var(--cell-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-shrink: 0;
+  }
+
+  .buzz-btn {
+    flex: 1;
+    max-width: 400px;
+    padding: 1rem 2rem;
+    background: var(--buzz-color);
+    border: none;
+    border-radius: 10px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.1s;
+    text-transform: uppercase;
+    box-shadow: 0 4px 20px rgba(255,102,0,0.4);
+  }
+
+  .buzz-btn:active { transform: scale(0.96); }
+
+  .buzz-btn:disabled {
+    background: #3a3a3a;
+    color: #666;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* Buzzer active — someone already buzzed */
+  .buzz-btn.locked {
+    background: #6a2200;
+    color: #ff9966;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .buzzer-status {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.1rem;
+    color: var(--muted);
+    text-align: right;
+    min-width: 160px;
+  }
+
+  .buzzer-status.winner-status { color: var(--buzz-color); font-size: 1.3rem; }
+  .buzzer-status.ready-status { color: var(--success); }
+
+  /* ─── OVERLAY ─── */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,5,0.92);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .overlay.open { display: flex; }
+
+  .overlay-box {
+    background: var(--panel-bg);
+    border: 2px solid var(--cell-border);
+    border-radius: 16px;
+    padding: 2rem 2.5rem;
+    width: min(700px, 95vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  /* ─── QUESTION OVERLAY STYLES ─── */
+  .overlay-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .overlay-category {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.9rem;
+    color: var(--gold);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+
+  .overlay-points {
+    font-family: 'Anton', sans-serif;
+    font-size: 2.5rem;
+    color: var(--gold);
+  }
+
+  .overlay-divider {
+    height: 1px;
+    background: linear-gradient(90deg, var(--cell-border), transparent);
+    margin: 1.2rem 0;
+  }
+
+  .overlay-question {
+    font-size: 1.4rem;
+    line-height: 1.6;
+    margin-bottom: 1.2rem;
+    font-weight: 600;
+  }
+
+  .overlay-img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    display: block;
+  }
+
+  /* Answer reveal section */
+  .overlay-answer-section {
+    background: rgba(34,204,102,0.1);
+    border: 1px solid var(--success);
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    margin-top: 1rem;
+  }
+
+  .overlay-answer-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--success);
+    margin-bottom: 0.5rem;
+  }
+
+  .overlay-answer-text {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.4;
+  }
+
+  /* Buzzer indicator in overlay */
+  .overlay-buzz-indicator {
+    display: none;
+    background: rgba(255,102,0,0.15);
+    border: 1px solid var(--buzz-color);
+    border-radius: 10px;
+    padding: 0.75rem 1.2rem;
+    margin-top: 1rem;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.1rem;
+    color: var(--buzz-color);
+    text-align: center;
+  }
+
+  .overlay-buzz-indicator.active { display: block; }
+
+  .overlay-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.2rem;
+  }
+
+  .close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0.25rem;
+  }
+
+  .close-btn:hover { color: var(--text); }
+
+  /* ─── BUZZER BANNER ─── */
+  .buzz-banner {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 1rem 2rem;
+    background: var(--buzz-color);
+    color: #fff;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 900;
+    text-align: center;
+    letter-spacing: 2px;
+    z-index: 200;
+    animation: slideDown 0.3s ease;
+  }
+
+  .buzz-banner.active { display: block; }
+
+  @keyframes slideDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+  }
+
+  /* ─── ADMIN PANEL ─── */
+  #admin-panel {
+    flex-direction: column;
+    background: var(--bg);
+  }
+
+  .admin-nav {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--cell-border);
+    align-items: center;
+  }
+
+  .admin-nav-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.2rem;
+    color: var(--gold);
+    margin-right: auto;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .tab-btn {
+    padding: 0.5rem 1.2rem;
+    border: 1px solid var(--cell-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tab-btn.active { background: var(--gold); color: #000; border-color: var(--gold); }
+  .tab-btn:hover:not(.active) { border-color: var(--gold); color: var(--gold); }
+
+  .admin-content {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+  }
+
+  /* ─── EDITOR ─── */
+  .editor-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+
+  .editor-category-input {
+    background: var(--blue-mid);
+    border: 1px solid var(--cell-border);
+    border-radius: 6px;
+    padding: 0.5rem;
+    color: var(--gold);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: center;
+    width: 100%;
+    outline: none;
+    text-transform: uppercase;
+  }
+
+  .editor-category-input:focus { border-color: var(--gold); }
+
+  .editor-q-card {
+    background: var(--blue-card);
+    border: 1px solid var(--cell-border);
+    border-radius: 6px;
+    padding: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .editor-points-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--gold);
+    text-align: center;
+  }
+
+  .editor-q-card textarea {
+    background: var(--input-bg);
+    border: 1px solid var(--cell-border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.8rem;
+    padding: 0.4rem;
+    resize: vertical;
+    min-height: 60px;
+    outline: none;
+    width: 100%;
+  }
+
+  .editor-q-card textarea:focus { border-color: var(--gold); }
+
+  .editor-answer-input {
+    background: rgba(34,204,102,0.08);
+    border: 1px solid rgba(34,204,102,0.3);
+    border-radius: 4px;
+    color: var(--success);
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.8rem;
+    padding: 0.4rem;
+    resize: vertical;
+    min-height: 40px;
+    outline: none;
+    width: 100%;
+  }
+
+  .editor-answer-input:focus { border-color: var(--success); }
+
+  .img-preview {
+    max-width: 100%;
+    border-radius: 4px;
+    margin-top: 0.25rem;
+  }
+
+  .img-upload-btn {
+    display: block;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+    cursor: pointer;
+    border: 1px dashed var(--cell-border);
+    border-radius: 4px;
+    padding: 0.4rem;
+    transition: border-color 0.15s;
+  }
+
+  .img-upload-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .img-upload-btn input { display: none; }
+
+  /* ─── ADMIN GAME VIEW ─── */
+  .admin-game-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1rem;
+    height: 100%;
+  }
+
+  .admin-right {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .admin-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--cell-border);
+    border-radius: 10px;
+    padding: 1.2rem;
+  }
+
+  .admin-card h3 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1rem;
+    color: var(--gold);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .admin-player-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--cell-border);
+    gap: 0.5rem;
+  }
+
+  .admin-player-row:last-child { border-bottom: none; }
+
+  .admin-player-name {
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-player-score {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.2rem;
+    color: var(--gold);
+    min-width: 60px;
+    text-align: right;
+  }
+
+  .score-controls {
+    display: flex;
+    gap: 0.3rem;
+  }
+
+  .score-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--cell-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s;
+  }
+
+  .score-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  .buzz-active-banner {
+    background: var(--buzz-color);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .buzz-active-banner .buz-name {
+    font-family: 'Anton', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 2px;
+  }
+
+  .buzz-active-banner .buz-sub {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    margin-top: 0.2rem;
+  }
+
+  /* ─── NOTIFICATION ─── */
+  .notif {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: var(--blue-card);
+    border: 1px solid var(--gold);
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.95rem;
+    z-index: 999;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s;
+    max-width: 300px;
+  }
+
+  .notif.show { transform: translateY(0); opacity: 1; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 700px) {
+    .board { grid-template-columns: repeat(5, 1fr); gap: 3px; }
+    .board-cell { min-height: 60px; padding: 0.3rem; }
+    .board-cell.question-cell .cell-points { font-size: 1.3rem; }
+    .board-cell.category-cell span { font-size: 0.7rem; }
+    .editor-grid { grid-template-columns: repeat(5, 1fr); }
+    .admin-game-layout { grid-template-columns: 1fr; }
+  }
+
+  /* ─── POINT INPUT FOR ADMIN ─── */
+  .point-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.5rem;
+  }
+
+  .point-input-row input {
+    flex: 1;
+    padding: 0.4rem 0.7rem;
+    background: var(--input-bg);
+    border: 1px solid var(--cell-border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+  }
+
+  .point-input-row input:focus { border-color: var(--gold); }
+
+  /* ─── CONFETTI ─── */
+  @keyframes confetti-fall {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  .confetti-piece {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    top: 0;
+    animation: confetti-fall 2s ease-in forwards;
+    z-index: 9999;
+    pointer-events: none;
+  }
+
+  /* ─── ACTIVE QUESTION HIGHLIGHT ON BOARD ─── */
+  .board-cell.active-question {
+    border-color: var(--gold) !important;
+    box-shadow: 0 0 16px rgba(245,197,24,0.5);
+    animation: pulse-gold 1.5s infinite;
+  }
+
+  @keyframes pulse-gold {
+    0%, 100% { box-shadow: 0 0 8px rgba(245,197,24,0.4); }
+    50% { box-shadow: 0 0 24px rgba(245,197,24,0.8); }
+  }
+
+  /* Overlay transition for question→answer swap */
+  .overlay-box.swap-out {
+    animation: swapOut 0.2s ease forwards;
+  }
+  .overlay-box.swap-in {
+    animation: swapIn 0.25s ease forwards;
+  }
+
+  @keyframes swapOut {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
+  }
+
+  @keyframes swapIn {
+    from { opacity: 0; transform: scale(1.02); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  /* Admin question overlay extra actions */
+  .admin-overlay-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--cell-border);
+  }
+
+  /* Reveal button */
+  .btn-reveal {
+    background: linear-gradient(135deg, #1a8a44, #22cc66);
+    color: #000;
+    font-weight: 900;
+    border: none;
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .btn-reveal:hover { filter: brightness(1.1); }
+
+  /* Question status tag */
+  .overlay-status-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Barlow Condensed', sans-serif;
+    padding: 0.25rem 0.7rem;
+    border-radius: 20px;
+    margin-bottom: 0.5rem;
+  }
+
+  .overlay-status-tag.tag-open {
+    background: rgba(34,204,102,0.15);
+    border: 1px solid var(--success);
+    color: var(--success);
+  }
+
+  .overlay-status-tag.tag-answer {
+    background: rgba(245,197,24,0.15);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+  }
+
+  /* Editor field labels */
+  .editor-field-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 0.15rem;
+    display: block;
+  }
+
+/* ─── SPOILER ─── */
+.spoiler {
+  display: inline-block;
+  background: #111;
+  color: transparent;
+  border-radius: 5px;
+  padding: 2px 7px;
+  cursor: default;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.spoiler-admin {
+  cursor: pointer;
+}
+
+.spoiler-admin:hover {
+  background: #333;
+}
+
+.spoiler.revealed {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  cursor: default;
+  user-select: text;
+}
+
+
+.spoiler-editor-tools {
+  margin: 4px 0 6px;
+}
+
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ LOBBY ═══════════════ -->
+<div id="lobby" class="screen active">
+  <div class="lobby-box">
+    <div class="logo">JEOPARDY</div>
+    <div class="logo-sub">Live Multiplayer</div>
+
+    <div class="role-tabs">
+      <button class="role-tab active" id="tab-player">Spieler</button>
+      <button class="role-tab" id="tab-admin">Admin</button>
+    </div>
+
+    <div id="player-form">
+      <div class="form-group">
+        <label>Dein Name</label>
+        <input type="text" id="player-name" placeholder="z.B. Alex" maxlength="20">
+      </div>
+      <div class="form-group">
+        <label>Room-Code</label>
+        <input type="text" id="player-room" placeholder="z.B. ABC123" maxlength="20">
+      </div>
+    </div>
+
+    <div id="admin-form" style="display:none">
+      <div class="form-group">
+        <label>Room-Code (neu erstellen oder beitreten)</label>
+        <input type="text" id="admin-room" placeholder="z.B. MYJEOPARDY" maxlength="20">
+      </div>
+      <div class="form-group">
+        <label>Admin-Passwort</label>
+        <input type="password" id="admin-pw" placeholder="Passwort setzen/eingeben" maxlength="30">
+      </div>
+    </div>
+
+    <div class="error-msg" id="lobby-error"></div>
+
+    <button class="btn btn-primary" id="join-btn">EINTRETEN →</button>
+
+    <div style="margin-top:1.5rem; font-size:0.8rem; color:var(--muted); line-height:1.5;">
+      💡 Admin erstellt den Room und verwaltet das Spiel.<br>
+      Spieler treten mit dem Room-Code bei.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ GAME (PLAYER) ═══════════════ -->
+<div id="game" class="screen">
+  <div class="buzz-banner" id="buzz-banner">🔔 <span id="buzz-winner-name"></span> hat gebuzzert!</div>
+
+  <div class="top-bar">
+    <div class="top-bar-title">JEOPARDY</div>
+    <div class="players-bar" id="players-bar"></div>
+    <div style="font-size:0.8rem; color:var(--muted);" id="room-label"></div>
+  </div>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="bottom-bar">
+    <div style="font-size:0.9rem; color:var(--muted); padding-left: 52px;">
+      Spieler: <strong id="my-name-display" style="color:var(--gold)"></strong>
+    </div>
+    <!-- Buzzer is always enabled for players (disabled state handled via locked class) -->
+    <button class="buzz-btn" id="buzz-btn" onclick="buzz()">⚡ BUZZERN</button>
+    <div class="buzzer-status" id="buzzer-status">Warte auf Frage...</div>
+  </div>
+</div>
+
+<!-- ═══════════════ ADMIN PANEL ═══════════════ -->
+<div id="admin-panel" class="screen">
+  <div class="buzz-banner" id="admin-buzz-banner">🔔 <span id="admin-buzz-winner-name"></span> hat gebuzzert!</div>
+
+  <div class="admin-nav">
+    <div class="admin-nav-title">Admin — JEOPARDY</div>
+    <button class="tab-btn active" onclick="adminTab('game')" id="tab-game">Spiel</button>
+    <button class="tab-btn" onclick="adminTab('editor')" id="tab-editor">Editor</button>
+    <button class="tab-btn btn-ghost btn-sm" onclick="goLobby()" style="margin-left:0.5rem">Verlassen</button>
+  </div>
+
+  <div class="admin-content">
+    <!-- Game Tab -->
+    <div id="admin-game-tab" class="admin-game-layout">
+      <div>
+        <div class="board" id="admin-board"></div>
+      </div>
+
+      <div class="admin-right">
+        <!-- Buzzer Status -->
+        <div class="admin-card">
+          <h3>Buzzer</h3>
+          <div id="admin-buzz-display">
+            <div style="color:var(--muted); font-size:0.9rem;">Kein aktiver Buzzer</div>
+          </div>
+          <div id="admin-buzz-actions" style="display:none">
+            <div style="color:var(--muted); font-size:0.8rem; margin-bottom:0.5rem;">Punkte vergeben:</div>
+            <div class="point-input-row">
+              <input type="number" id="custom-points" placeholder="Punkte" min="-9999" max="9999">
+              <button class="btn btn-success btn-sm" onclick="awardPoints(true)">+ Richtig</button>
+            </div>
+            <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+              <button class="btn btn-danger btn-sm" onclick="awardPoints(false)">− Falsch</button>
+              <button class="btn btn-ghost btn-sm" onclick="resetBuzzer()">🔓 Freigeben</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Spieler -->
+        <div class="admin-card">
+          <h3>Spieler</h3>
+          <div id="admin-players-list"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="admin-card">
+          <h3>Steuerung</h3>
+          <div style="display:flex; flex-direction:column; gap:0.5rem;">
+            <button class="btn btn-ghost btn-sm" onclick="resetBuzzer()">🔓 Buzzer freigeben</button>
+            <button class="btn btn-danger btn-sm" onclick="resetGame()">Spiel zurücksetzen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Editor Tab -->
+    <div id="admin-editor-tab" style="display:none">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <div style="font-family:'Barlow Condensed'; font-size:1.1rem; color:var(--gold); text-transform:uppercase; letter-spacing:2px;">Board Editor</div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-ghost btn-sm" onclick="loadEditorData()">Zurücksetzen</button>
+          <button class="btn btn-primary btn-sm" onclick="saveEditorData()">Speichern & Veröffentlichen</button>
+        </div>
+      </div>
+
+      <div style="font-size:0.85rem; color:var(--muted); margin-bottom:1rem;">
+        Kategorien oben eingeben. Pro Zelle: Frage + Antwort + optional Bild.<br>
+        Punkte: 200 / 400 / 600 / 800 / 1000 (von oben nach unten).
+      </div>
+
+      <div class="editor-grid" id="editor-grid"></div>
+
+      <div style="display:flex; justify-content:flex-end; margin-top:1rem;">
+        <button class="btn btn-primary" onclick="saveEditorData()">Speichern & Veröffentlichen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ QUESTION OVERLAY (PLAYER) ═══════════════ -->
+<div class="overlay" id="question-overlay">
+  <div class="overlay-box" id="question-overlay-box">
+    <div class="overlay-status-tag tag-open">● Frage offen</div>
+    <div class="overlay-header">
+      <div class="overlay-category" id="q-category"></div>
+      <div class="overlay-points" id="q-points"></div>
+    </div>
+    <div class="overlay-divider"></div>
+    <div class="overlay-question" id="q-text"></div>
+    <img id="q-img" class="overlay-img" src="" alt="" style="display:none">
+    <div class="overlay-buzz-indicator" id="q-buzz-indicator"></div>
+    <div class="overlay-actions" style="margin-top:1.5rem;">
+      <button class="buzz-btn" id="overlay-buzz-btn" onclick="buzz()" style="max-width:none; width:100%; font-size:1.3rem; padding:0.9rem 1.5rem;">⚡ BUZZERN</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ANSWER OVERLAY (PLAYER) ═══════════════ -->
+<div class="overlay" id="answer-overlay">
+  <div class="overlay-box" id="answer-overlay-box">
+    <button class="close-btn" id="answer-close-btn" onclick="closeAnswer()" style="display:none">✕</button>
+    <div class="overlay-status-tag tag-answer">✓ Antwort</div>
+    <div class="overlay-header">
+      <div class="overlay-category" id="a-category"></div>
+      <div class="overlay-points" id="a-points"></div>
+    </div>
+    <div class="overlay-divider"></div>
+    <div class="overlay-question" id="a-text" style="color:var(--muted); font-size:1.1rem;"></div>
+    <img id="a-question-img" class="overlay-img" src="" alt="" style="display:none">
+    <div class="overlay-answer-section">
+      <div class="overlay-answer-label">Gesuchte Antwort</div>
+      <div class="overlay-answer-text" id="a-answer"></div>
+      <img id="a-answer-img" class="overlay-img" src="" alt="" style="display:none; margin-top:0.8rem;">
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ QUESTION OVERLAY (ADMIN) ═══════════════ -->
+<div class="overlay" id="admin-question-overlay">
+  <div class="overlay-box" id="admin-question-overlay-box">
+    <button class="close-btn" onclick="closeAdminQuestion()">✕</button>
+    <div class="overlay-status-tag tag-open" id="aq-status-tag">● Frage offen</div>
+    <div class="overlay-header">
+      <div class="overlay-category" id="aq-category"></div>
+      <div class="overlay-points" id="aq-points"></div>
+    </div>
+    <div class="overlay-divider"></div>
+    <div class="overlay-question" id="aq-text"></div>
+    <img id="aq-img" class="overlay-img" src="" alt="" style="display:none">
+
+    <!-- Buzzer indicator in admin overlay -->
+    <div class="overlay-buzz-indicator" id="aq-buzz-indicator"></div>
+
+    <!-- Answer section (hidden until revealed) -->
+    <div class="overlay-answer-section" id="aq-answer-section" style="display:none">
+      <div class="overlay-answer-label">Gesuchte Antwort</div>
+      <div class="overlay-answer-text" id="aq-answer-text"></div>
+      <img id="aq-answer-img" class="overlay-img" src="" alt="" style="display:none; margin-top:0.8rem;">
+    </div>
+
+    <div class="admin-overlay-actions">
+      <button class="btn btn-reveal btn-sm" onclick="revealAnswer()" id="aq-reveal-btn">🔍 Antwort aufdecken</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetBuzzer()">🔓 Buzzer freigeben</button>
+      <button class="btn btn-success btn-sm" onclick="markAnswered()" id="aq-answered-btn">✓ Als beantwortet</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeAdminQuestion()">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<!-- ═══════════════ UI (plain script, no module) ═══════════════ -->
+<script>
+var _currentRole = 'player';
+
+function updateJoinBtn() {
+  var btn = document.getElementById('join-btn');
+  if (_currentRole === 'admin') {
+    btn.textContent = 'ROOM ERSTELLEN / BEITRETEN →';
+  } else {
+    btn.textContent = 'EINTRETEN →';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('tab-player').addEventListener('click', function() {
+    _currentRole = 'player';
+    document.getElementById('tab-player').classList.add('active');
+    document.getElementById('tab-admin').classList.remove('active');
+    document.getElementById('player-form').style.display = '';
+    document.getElementById('admin-form').style.display = 'none';
+    document.getElementById('lobby-error').textContent = '';
+    updateJoinBtn();
+  });
+
+  document.getElementById('tab-admin').addEventListener('click', function() {
+    _currentRole = 'admin';
+    document.getElementById('tab-admin').classList.add('active');
+    document.getElementById('tab-player').classList.remove('active');
+    document.getElementById('admin-form').style.display = '';
+    document.getElementById('player-form').style.display = 'none';
+    document.getElementById('lobby-error').textContent = '';
+    updateJoinBtn();
+  });
+
+  document.getElementById('join-btn').addEventListener('click', function() {
+    var btn = document.getElementById('join-btn');
+    var errorEl = document.getElementById('lobby-error');
+
+    if (!window._joinGame) {
+      errorEl.textContent = 'App lädt noch, bitte kurz warten...';
+      setTimeout(function() {
+        if (window._joinGame) {
+          errorEl.textContent = '';
+          window._joinGame(_currentRole);
+        } else {
+          errorEl.textContent = 'Fehler: Firebase konnte nicht geladen werden. Seite neu laden!';
+        }
+      }, 1500);
+      return;
+    }
+
+    btn.textContent = 'Verbinde...';
+    btn.disabled = true;
+    window._joinGame(_currentRole).finally(function() {
+      btn.disabled = false;
+      updateJoinBtn();
+    });
+  });
+});
+</script>
+
+<!-- ═══════════════ FIREBASE ═══════════════ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getDatabase, ref, set, get, onValue, update, remove, push
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+// ─── FIREBASE CONFIG ───
+const firebaseConfig = {
+  apiKey: "AIzaSyCVfrGjTIIE2Q82MSAHJ8ZDzxHIR5JEmzU",
+  authDomain: "anime-jeopardy-3035d.firebaseapp.com",
+  databaseURL: "https://anime-jeopardy-3035d-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "anime-jeopardy-3035d",
+  storageBucket: "anime-jeopardy-3035d.firebasestorage.app",
+  messagingSenderId: "141208009663",
+  appId: "1:141208009663:web:22c6c1e58d9b44b3643f0a",
+  measurementId: "G-B95374GSHL"
+};
+
+// ─── STATE ───
+let db, app;
+let myRole = 'player';
+let myName = '';
+let myId = '';
+let roomCode = '';
+let adminPw = '';
+let boardData = null;
+let currentQuestion = null;
+let currentAdminQuestion = null;
+let spoilerReveals = {};
+let listeners = [];
+
+const POINTS = [200, 400, 600, 800, 1000];
+
+// ─── AUDIO ───
+
+// ── Buzzer Sound (Web Audio API — kein externes Hosting, kein CORS) ──
+let audioCtx;
+function playBuzzerSound() {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // AudioContext nach User-Interaktion ggf. wieder aufwecken
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    // "Game show buzzer" sound
+    osc.type = "square";
+    osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    // kurzer "buzz"
+    setTimeout(() => {
+      osc.stop();
+    }, 180);
+  } catch (e) {
+    console.log("Buzzer error:", e);
+  }
+}
+
+// ── Lofi Background Music: procedurally generated loop ──
+let lofiMuted = false;
+let lofiGain = null;
+let lofiCtx = null;
+let lofiInterval = null;
+
+const LOFI_NOTES = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]; // C major
+
+function playLofiNote(ctx, master) {
+  const note = LOFI_NOTES[Math.floor(Math.random() * LOFI_NOTES.length)];
+  const octave = Math.random() > 0.5 ? 1 : 0.5;
+  const when = ctx.currentTime;
+  const duration = 0.4 + Math.random() * 0.6;
+
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = note * octave;
+
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0, when);
+  env.gain.linearRampToValueAtTime(0.18, when + 0.05);
+  env.gain.exponentialRampToValueAtTime(0.001, when + duration);
+
+  osc.connect(env);
+  env.connect(master);
+  osc.start(when);
+  osc.stop(when + duration + 0.1);
+}
+
+function setupLofi() {
+  if (lofiCtx) return;
+  lofiCtx = new (window.AudioContext || window.webkitAudioContext)();
+  lofiGain = lofiCtx.createGain();
+  lofiGain.gain.value = 0.4;
+  lofiGain.connect(lofiCtx.destination);
+}
+
+function startLofi() {
+  setupLofi();
+  if (lofiCtx.state === 'suspended') lofiCtx.resume();
+  lofiMuted = false;
+  lofiGain.gain.value = 0.4;
+  if (!lofiInterval) {
+    playLofiNote(lofiCtx, lofiGain);
+    lofiInterval = setInterval(() => {
+      if (!lofiMuted) playLofiNote(lofiCtx, lofiGain);
+    }, 500 + Math.random() * 300);
+  }
+}
+
+function updateMusicBtn() {
+  const btn = document.getElementById('music-toggle');
+  if (!btn) return;
+  if (lofiMuted) {
+    btn.textContent = '🔇';
+    btn.style.borderColor = 'var(--cell-border)';
+    btn.style.color = 'var(--muted)';
+  } else {
+    btn.textContent = '🎵';
+    btn.style.borderColor = 'var(--success)';
+    btn.style.color = 'var(--success)';
+  }
+}
+
+function addMusicToggle() {
+  if (document.getElementById('music-toggle')) return;
+  const btn = document.createElement('button');
+  btn.id = 'music-toggle';
+  btn.textContent = '🎵';
+  btn.title = 'Musik an/aus';
+  btn.style.cssText = `
+    position: fixed; bottom: 1.1rem; left: 1.1rem;
+    width: 40px; height: 40px;
+    background: rgba(14,14,50,0.9);
+    border: 1px solid var(--success);
+    border-radius: 50%;
+    color: var(--success);
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 500;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    backdrop-filter: blur(6px);
+  `;
+  btn.onclick = () => {
+    if (!lofiCtx) {
+      startLofi();
+      updateMusicBtn();
+      return;
+    }
+    if (lofiMuted) {
+      lofiMuted = false;
+      lofiGain.gain.value = 0.4;
+      if (lofiCtx.state === 'suspended') lofiCtx.resume();
+    } else {
+      lofiMuted = true;
+      lofiGain.gain.value = 0;
+    }
+    updateMusicBtn();
+  };
+  document.body.appendChild(btn);
+}
+
+setupLofi();
+
+// Default board data
+const defaultBoard = {
+  categories: ['Kategorie 1', 'Kategorie 2', 'Kategorie 3', 'Kategorie 4', 'Kategorie 5'],
+  questions: Array.from({length: 5}, (_, row) =>
+    Array.from({length: 5}, (_, col) => ({
+      text: `Frage für Zeile ${row+1}, Spalte ${col+1}`,
+      answer: '',
+      image: null,
+      answered: false
+    }))
+  )
+};
+
+// ─── HELPERS ───
+function showNotif(msg, duration=3000) {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function showError(msg) {
+  document.getElementById('lobby-error').textContent = msg;
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ─── FIREBASE INIT ───
+async function initFirebase() {
+  if (app) return;
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getDatabase(app);
+  } catch(e) {
+    const { getApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    app = getApp();
+    db = getDatabase(app);
+  }
+}
+
+// ─── JOIN ───
+async function joinGame(role) {
+  try {
+    await initFirebase();
+  } catch(e) {
+    return showError('Firebase konnte nicht geladen werden. Bitte Firebase-Config prüfen!');
+  }
+  showError('');
+  myRole = role || window._currentRole || 'player';
+
+  try {
+    if (myRole === 'player') {
+      myName = document.getElementById('player-name').value.trim();
+      roomCode = document.getElementById('player-room').value.trim().toUpperCase();
+      if (!myName) return showError('Bitte deinen Namen eingeben.');
+      if (!roomCode) return showError('Bitte den Room-Code eingeben.');
+
+      const snap = await get(ref(db, `rooms/${roomCode}`));
+      if (!snap.exists()) return showError('Room nicht gefunden. Bitte Admin bitten, den Room zu erstellen.');
+
+      myId = 'player_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+      await set(ref(db, `rooms/${roomCode}/players/${myId}`), { name: myName, score: 0, online: true });
+
+      boardData = snap.val().board || defaultBoard;
+      showScreen('game');
+      setupGame();
+      addMusicToggle();
+      startLofi();
+      setTimeout(updateMusicBtn, 300); // update button after play attempt
+
+    } else {
+      roomCode = document.getElementById('admin-room').value.trim().toUpperCase();
+      adminPw = document.getElementById('admin-pw').value.trim();
+      if (!roomCode) return showError('Bitte Room-Code eingeben.');
+      if (!adminPw) return showError('Bitte Admin-Passwort eingeben.');
+
+      const snap = await get(ref(db, `rooms/${roomCode}`));
+      if (snap.exists()) {
+        const storedPw = snap.val().adminPw;
+        if (storedPw && storedPw !== adminPw) return showError('Falsches Admin-Passwort.');
+      } else {
+        await set(ref(db, `rooms/${roomCode}`), {
+          adminPw,
+          board: defaultBoard,
+          buzzer: { active: false, winner: null, winnerName: '' },
+          answered: {},
+          players: {},
+          activeQuestion: null,
+          showAnswer: null,
+          buzzEnabled: false
+        });
+      }
+
+      myId = 'admin';
+      myName = 'Admin';
+      boardData = snap.exists() ? (snap.val().board || defaultBoard) : defaultBoard;
+      showScreen('admin-panel');
+      setupAdmin();
+      addMusicToggle();
+      startLofi();
+      setTimeout(updateMusicBtn, 300);
+    }
+  } catch(e) {
+    showError('Verbindungsfehler: ' + e.message);
+  }
+}
+
+window._joinGame = joinGame;
+window.joinGame = joinGame;
+window.goLobby = goLobby;
+
+function goLobby() {
+  listeners.forEach(off => off && off());
+  listeners = [];
+  if (myId && myId !== 'admin') {
+    remove(ref(db, `rooms/${roomCode}/players/${myId}`)).catch(()=>{});
+  }
+  showScreen('lobby');
+}
+
+// ════════════════════════════════════════════
+// ─── GAME SETUP (PLAYER) ───
+// ════════════════════════════════════════════
+function setupGame() {
+  document.getElementById('my-name-display').textContent = myName;
+  document.getElementById('room-label').textContent = `Room: ${roomCode}`;
+  renderBoard('board', false);
+  listenPlayers();
+  listenBuzzer();
+  listenBoard();
+  listenAnswered();
+  listenActiveQuestion();
+  listenShowAnswer();
+  listenCloseOverlay();   // NEW: close overlays when admin marks answered
+  listenSpoilerReveals();
+}
+
+// ─── SPOILER HELPERS ───
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Syntax used by the editor:
+// [[spoiler]]Dieser Teil ist verborgen[[/spoiler]]
+function renderSpoilerText(text, row, col, isAdmin) {
+  const source = String(text ?? '');
+  const regex = /\[\[spoiler\]\]([\s\S]*?)\[\[\/spoiler\]\]/gi;
+  let html = '';
+  let lastIndex = 0;
+  let spoilerIndex = 0;
+  let match;
+
+  while ((match = regex.exec(source)) !== null) {
+    html += escapeHtml(source.slice(lastIndex, match.index)).replace(/\n/g, '<br>');
+
+    const key = `${row}_${col}_${spoilerIndex}`;
+    const revealed = !!spoilerReveals[key];
+    const classes = `spoiler ${isAdmin ? 'spoiler-admin' : ''} ${revealed ? 'revealed' : ''}`;
+    const onclick = isAdmin && !revealed
+      ? ` onclick="revealSpoiler(${row}, ${col}, ${spoilerIndex})"`
+      : '';
+
+    html += `<span class="${classes}"${onclick}>${escapeHtml(match[1]).replace(/\n/g, '<br>')}</span>`;
+    lastIndex = regex.lastIndex;
+    spoilerIndex++;
+  }
+
+  html += escapeHtml(source.slice(lastIndex)).replace(/\n/g, '<br>');
+  return html;
+}
+
+// Markiert den aktuell ausgewählten Text im Frage-Textarea als Spoiler.
+window.insertSpoiler = function(row, col) {
+  const textarea = document.getElementById(`q_${row}_${col}`);
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+
+  if (start === end) {
+    showNotif('Bitte zuerst den Text markieren, der ein Spoiler werden soll.');
+    textarea.focus();
+    return;
+  }
+
+  const selected = textarea.value.slice(start, end);
+
+  if (selected.includes('[[spoiler]]') || selected.includes('[[/spoiler]]')) {
+    showNotif('Der markierte Text enthält bereits einen Spoiler-Marker.');
+    return;
+  }
+
+  textarea.setRangeText(`[[spoiler]]${selected}[[/spoiler]]`, start, end, 'select');
+  textarea.focus();
+};
+
+// Nur der Admin darf einen Spoiler aufdecken.
+// Der Status wird an alle Teilnehmer des Rooms übertragen.
+window.revealSpoiler = async function(row, col, spoilerIndex) {
+  if (myRole !== 'admin') return;
+
+  const key = `${row}_${col}_${spoilerIndex}`;
+  spoilerReveals[key] = true;
+
+  await set(ref(db, `rooms/${roomCode}/spoilerReveals/${key}`), true);
+};
+
+// ─── LISTEN: SPOILER REVEALS ───
+function listenSpoilerReveals() {
+  const r = ref(db, `rooms/${roomCode}/spoilerReveals`);
+  const off = onValue(r, snap => {
+    spoilerReveals = snap.val() || {};
+
+    if (currentQuestion) {
+      const q = boardData.questions[currentQuestion.row]?.[currentQuestion.col];
+      if (q) {
+        document.getElementById('q-text').innerHTML =
+          renderSpoilerText(q.text, currentQuestion.row, currentQuestion.col, false);
+      }
+    }
+
+    if (currentAdminQuestion) {
+      const q = boardData.questions[currentAdminQuestion.row]?.[currentAdminQuestion.col];
+      if (q) {
+        document.getElementById('aq-text').innerHTML =
+          renderSpoilerText(q.text, currentAdminQuestion.row, currentAdminQuestion.col, true);
+      }
+    }
+
+    const answerOverlay = document.getElementById('answer-overlay');
+    if (answerOverlay?.classList.contains('open') && currentQuestion) {
+      const q = boardData.questions[currentQuestion.row]?.[currentQuestion.col];
+      if (q) {
+        document.getElementById('a-text').innerHTML =
+          renderSpoilerText(q.text, currentQuestion.row, currentQuestion.col, false);
+      }
+    }
+  });
+  listeners.push(off);
+}
+
+// ─── BOARD RENDER ───
+function renderBoard(containerId, isAdmin) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const bd = boardData || defaultBoard;
+
+  // Categories row
+  bd.categories.forEach((cat, col) => {
+    const cell = document.createElement('div');
+    cell.className = 'board-cell category-cell';
+    cell.innerHTML = `<span>${cat || 'Kategorie ' + (col+1)}</span>`;
+    container.appendChild(cell);
+  });
+
+  // Questions
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 5; col++) {
+      const q = bd.questions[row]?.[col] || { text: '', image: null, answered: false };
+      const cell = document.createElement('div');
+      cell.className = 'board-cell question-cell' + (q.answered ? ' answered' : '');
+      cell.dataset.row = row;
+      cell.dataset.col = col;
+      cell.innerHTML = `<span class="cell-points">${POINTS[row]}</span>`;
+
+      if (!q.answered) {
+        if (isAdmin) {
+          // Admin can click to open question
+          cell.onclick = () => openQuestionAdminAt(row, col);
+        }
+        // Players: no click handler — board is view-only
+      } else {
+        // Clicking answered cell shows the answer overlay for everyone
+        if (isAdmin) {
+          cell.onclick = () => showAnsweredCell(row, col);
+        } else {
+          cell.onclick = () => showAnsweredCell(row, col);
+        }
+      }
+
+      container.appendChild(cell);
+    }
+  }
+}
+
+// Show answer for an already-answered cell (when clicking green cells)
+function showAnsweredCell(row, col) {
+  const q = boardData.questions[row]?.[col];
+  if (!q) return;
+  populateAnswerOverlay(row, col);
+  document.getElementById('answer-overlay').classList.add('open');
+
+  if (myRole === 'admin') {
+    // Admin gets close button
+    document.getElementById('answer-close-btn').style.display = '';
+    // Push to players so they see it too
+    update(ref(db, `rooms/${roomCode}`), { showAnswer: { row, col } });
+  } else {
+    document.getElementById('answer-close-btn').style.display = 'none';
+  }
+}
+
+// ─── OPEN QUESTION (PLAYER — triggered by Firebase) ───
+function openQuestionForPlayer(row, col) {
+  const q = boardData.questions[row]?.[col];
+  if (!q || q.answered) return;
+  currentQuestion = { row, col };
+
+  document.getElementById('q-category').textContent = boardData.categories[col];
+  document.getElementById('q-points').textContent = POINTS[row] + ' Punkte';
+  document.getElementById('q-text').innerHTML = renderSpoilerText(q.text, row, col, false);
+
+  const img = document.getElementById('q-img');
+  if (q.image) { img.src = q.image; img.style.display = 'block'; }
+  else { img.style.display = 'none'; }
+
+  document.getElementById('q-buzz-indicator').classList.remove('active');
+  document.getElementById('question-overlay').classList.add('open');
+  document.getElementById('answer-overlay').classList.remove('open');
+}
+
+// Populate the answer overlay fields
+function populateAnswerOverlay(row, col) {
+  const q = boardData.questions[row]?.[col];
+  if (!q) return;
+  document.getElementById('a-category').textContent = boardData.categories[col];
+  document.getElementById('a-points').textContent = POINTS[row] + ' Punkte';
+  document.getElementById('a-text').innerHTML = renderSpoilerText(q.text, row, col, false);
+  document.getElementById('a-answer').textContent = q.answer || 'Keine Antwort hinterlegt';
+
+  // Question image (shown above answer box)
+  const qImg = document.getElementById('a-question-img');
+  if (q.image) { qImg.src = q.image; qImg.style.display = 'block'; }
+  else { qImg.style.display = 'none'; }
+
+  // Answer image (shown inside answer box)
+  const aImg = document.getElementById('a-answer-img');
+  if (q.answerImage) { aImg.src = q.answerImage; aImg.style.display = 'block'; }
+  else { aImg.style.display = 'none'; }
+}
+
+window.closeAnswer = function() {
+  document.getElementById('answer-overlay').classList.remove('open');
+  // If admin closes, also close for players
+  if (myRole === 'admin' && db && roomCode) {
+    update(ref(db, `rooms/${roomCode}`), { showAnswer: null, closeOverlay: Date.now() });
+  }
+};
+
+// ─── LISTEN: ACTIVE QUESTION (PLAYER) ───
+function listenActiveQuestion() {
+  const r = ref(db, `rooms/${roomCode}/activeQuestion`);
+  const off = onValue(r, snap => {
+    const data = snap.val();
+    if (data && data.row !== undefined && data.col !== undefined) {
+      openQuestionForPlayer(data.row, data.col);
+      // highlight on board
+      document.querySelectorAll('#board .question-cell').forEach(c => c.classList.remove('active-question'));
+      const cell = document.querySelector(`#board .question-cell[data-row="${data.row}"][data-col="${data.col}"]`);
+      if (cell) cell.classList.add('active-question');
+    } else {
+      // Question closed — close player overlay if it's open and not showing answer
+      document.getElementById('question-overlay').classList.remove('open');
+      document.querySelectorAll('#board .question-cell').forEach(c => c.classList.remove('active-question'));
+    }
+  });
+  listeners.push(off);
+}
+
+// ─── LISTEN: SHOW ANSWER (PLAYER) ───
+function listenShowAnswer() {
+  const r = ref(db, `rooms/${roomCode}/showAnswer`);
+  const off = onValue(r, snap => {
+    const data = snap.val();
+    if (data && data.row !== undefined) {
+      const qOverlay = document.getElementById('question-overlay');
+      const aOverlay = document.getElementById('answer-overlay');
+      const aBox = document.getElementById('answer-overlay-box');
+
+      populateAnswerOverlay(data.row, data.col);
+      // Players never get close button — only admin
+      document.getElementById('answer-close-btn').style.display = 'none';
+
+      if (qOverlay.classList.contains('open')) {
+        const qBox = document.getElementById('question-overlay-box');
+        qBox.classList.add('swap-out');
+        setTimeout(() => {
+          qOverlay.classList.remove('open');
+          qBox.classList.remove('swap-out');
+          aOverlay.classList.add('open');
+          aBox.classList.add('swap-in');
+          setTimeout(() => aBox.classList.remove('swap-in'), 300);
+        }, 200);
+      } else {
+        aOverlay.classList.add('open');
+      }
+    } else {
+      // showAnswer cleared — close answer overlay for players
+      document.getElementById('answer-overlay').classList.remove('open');
+    }
+  });
+  listeners.push(off);
+}
+
+// ─── LISTEN: CLOSE OVERLAYS (PLAYER) — triggered when admin marks answered ───
+function listenCloseOverlay() {
+  const r = ref(db, `rooms/${roomCode}/closeOverlay`);
+  const off = onValue(r, snap => {
+    if (snap.val()) {
+      document.getElementById('question-overlay').classList.remove('open');
+      document.getElementById('answer-overlay').classList.remove('open');
+      document.querySelectorAll('#board .question-cell').forEach(c => c.classList.remove('active-question'));
+      currentQuestion = null;
+    }
+  });
+  listeners.push(off);
+}
+
+
+
+// ─── BUZZER (PLAYER) ───
+// Players can ALWAYS buzz (the button is always visible).
+// If buzzer is locked (someone already buzzed), clicking shows "locked" feedback.
+async function buzz() {
+  if (!myId || myRole !== 'player') return;
+
+  const snap = await get(ref(db, `rooms/${roomCode}/buzzer`));
+  const buzzer = snap.val();
+
+  if (buzzer?.active) {
+    // Already locked — visual feedback only
+    const btn = document.getElementById('buzz-btn');
+    btn.classList.add('locked');
+    showNotif(`${buzzer.winnerName} hat bereits gebuzzert!`);
+    return;
+  }
+
+  await set(ref(db, `rooms/${roomCode}/buzzer`), {
+    active: true,
+    winner: myId,
+    winnerName: myName,
+    timestamp: Date.now()
+  });
+}
+window.buzz = buzz;
+
+// ─── BUZZER LISTEN (PLAYER) ───
+function listenBuzzer() {
+  const r = ref(db, `rooms/${roomCode}/buzzer`);
+  const off = onValue(r, snap => {
+    const b = snap.val();
+    const btn = document.getElementById('buzz-btn');
+    const status = document.getElementById('buzzer-status');
+    const banner = document.getElementById('buzz-banner');
+    const winnerEl = document.getElementById('buzz-winner-name');
+    const buzzIndicator = document.getElementById('q-buzz-indicator');
+
+    document.querySelectorAll('.player-chip').forEach(c => c.classList.remove('buzzer-winner'));
+
+    if (b?.active) {
+      winnerEl.textContent = b.winnerName;
+      banner.classList.add('active');
+      status.textContent = `🔔 ${b.winnerName} buzzert!`;
+      status.className = 'buzzer-status winner-status';
+
+      playBuzzerSound();
+
+      // Lock both buzz buttons
+      btn.classList.add('locked');
+      btn.textContent = '🔒 GESPERRT';
+      const overlayBtn = document.getElementById('overlay-buzz-btn');
+      if (overlayBtn) { overlayBtn.classList.add('locked'); overlayBtn.textContent = '🔒 GESPERRT'; }
+
+      // Highlight winner chip
+      document.querySelectorAll('.player-chip').forEach(c => {
+        if (c.dataset.pid === b.winner) c.classList.add('buzzer-winner');
+      });
+
+      // Show in question overlay too
+      if (buzzIndicator) {
+        buzzIndicator.textContent = `🔔 ${b.winnerName} hat gebuzzert!`;
+        buzzIndicator.classList.add('active');
+      }
+
+      setTimeout(() => banner.classList.remove('active'), 3000);
+    } else {
+      banner.classList.remove('active');
+      status.textContent = 'Bereit zum Buzzern!';
+      status.className = 'buzzer-status ready-status';
+
+      // Unlock both buzz buttons
+      btn.classList.remove('locked');
+      btn.textContent = '⚡ BUZZERN';
+      const overlayBtn = document.getElementById('overlay-buzz-btn');
+      if (overlayBtn) { overlayBtn.classList.remove('locked'); overlayBtn.textContent = '⚡ BUZZERN'; }
+
+      if (buzzIndicator) {
+        buzzIndicator.textContent = '';
+        buzzIndicator.classList.remove('active');
+      }
+    }
+  });
+  listeners.push(off);
+}
+
+// ─── PLAYERS LISTEN ───
+function listenPlayers() {
+  const r = ref(db, `rooms/${roomCode}/players`);
+  const off = onValue(r, snap => {
+    const players = snap.val() || {};
+    renderPlayers(players, false);
+  });
+  listeners.push(off);
+}
+
+function renderPlayers(players, isAdmin) {
+  if (!isAdmin) {
+    const bar = document.getElementById('players-bar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    Object.entries(players).forEach(([pid, p]) => {
+      const chip = document.createElement('div');
+      chip.className = 'player-chip';
+      chip.dataset.pid = pid;
+      chip.innerHTML = `<div class="p-name">${p.name}</div><div class="p-score">${p.score ?? 0}</div>`;
+      bar.appendChild(chip);
+    });
+  } else {
+    const list = document.getElementById('admin-players-list');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!Object.keys(players).length) {
+      list.innerHTML = '<div style="color:var(--muted); font-size:0.9rem;">Keine Spieler online</div>';
+      return;
+    }
+    Object.entries(players).forEach(([pid, p]) => {
+      const row = document.createElement('div');
+      row.className = 'admin-player-row';
+      row.dataset.pid = pid;
+      row.innerHTML = `
+        <div class="admin-player-name">${p.name}</div>
+        <div class="admin-player-score">${p.score ?? 0}</div>
+        <div class="score-controls">
+          <button class="score-btn" onclick="adjustScore('${pid}', 100)">+</button>
+          <button class="score-btn" onclick="adjustScore('${pid}', -100)">−</button>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+  }
+}
+
+// ─── LISTEN ANSWERED (PLAYER) ───
+function listenAnswered() {
+  const r = ref(db, `rooms/${roomCode}/answered`);
+  const off = onValue(r, snap => {
+    const answered = snap.val() || {};
+    document.querySelectorAll('#board .question-cell').forEach(cell => {
+      const key = `${cell.dataset.row}_${cell.dataset.col}`;
+      if (answered[key]) {
+        cell.classList.add('answered');
+        cell.classList.remove('active-question');
+        if (boardData.questions[cell.dataset.row]?.[cell.dataset.col]) {
+          boardData.questions[cell.dataset.row][cell.dataset.col].answered = true;
+        }
+        // Allow clicking to see the answer
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+        cell.onclick = () => showAnsweredCell(row, col);
+      }
+    });
+  });
+  listeners.push(off);
+}
+
+// ─── LISTEN BOARD CHANGES ───
+function listenBoard() {
+  const r = ref(db, `rooms/${roomCode}/board`);
+  const off = onValue(r, snap => {
+    if (snap.exists()) {
+      boardData = snap.val();
+      renderBoard('board', false);
+    }
+  });
+  listeners.push(off);
+}
+
+// ════════════════════════════════════════════
+// ─── ADMIN SETUP ───
+// ════════════════════════════════════════════
+function setupAdmin() {
+  renderBoard('admin-board', true);
+  listenAdminPlayers();
+  listenAdminBuzzer();
+  listenAdminAnswered();
+  listenAdminBoard();
+  buildEditor();
+  listenSpoilerReveals();
+}
+
+function adminTab(tab) {
+  document.getElementById('admin-game-tab').style.display = tab === 'game' ? '' : 'none';
+  document.getElementById('admin-editor-tab').style.display = tab === 'editor' ? '' : 'none';
+  document.getElementById('tab-game').classList.toggle('active', tab === 'game');
+  document.getElementById('tab-editor').classList.toggle('active', tab === 'editor');
+}
+window.adminTab = adminTab;
+
+function listenAdminPlayers() {
+  const r = ref(db, `rooms/${roomCode}/players`);
+  const off = onValue(r, snap => {
+    renderPlayers(snap.val() || {}, true);
+  });
+  listeners.push(off);
+}
+
+function listenAdminBuzzer() {
+  const r = ref(db, `rooms/${roomCode}/buzzer`);
+  const off = onValue(r, snap => {
+    const b = snap.val();
+    const banner = document.getElementById('admin-buzz-banner');
+    const winnerEl = document.getElementById('admin-buzz-winner-name');
+    const display = document.getElementById('admin-buzz-display');
+    const actions = document.getElementById('admin-buzz-actions');
+    const buzzInd = document.getElementById('aq-buzz-indicator');
+
+    if (b?.active) {
+      winnerEl.textContent = b.winnerName;
+      banner.classList.add('active');
+      setTimeout(() => banner.classList.remove('active'), 3000);
+
+      playBuzzerSound();
+
+      display.innerHTML = `
+        <div class="buzz-active-banner">
+          <div class="buz-name">🔔 ${b.winnerName}</div>
+          <div class="buz-sub">hat gebuzzert!</div>
+        </div>
+      `;
+      actions.style.display = '';
+
+      if (currentAdminQuestion) {
+        document.getElementById('custom-points').value = POINTS[currentAdminQuestion.row];
+      }
+
+      // Show in admin overlay
+      if (buzzInd) {
+        buzzInd.textContent = `🔔 ${b.winnerName} hat gebuzzert!`;
+        buzzInd.classList.add('active');
+      }
+    } else {
+      banner.classList.remove('active');
+      display.innerHTML = '<div style="color:var(--muted); font-size:0.9rem;">Kein aktiver Buzzer</div>';
+      actions.style.display = 'none';
+      if (buzzInd) {
+        buzzInd.textContent = '';
+        buzzInd.classList.remove('active');
+      }
+    }
+  });
+  listeners.push(off);
+}
+
+function listenAdminAnswered() {
+  const r = ref(db, `rooms/${roomCode}/answered`);
+  const off = onValue(r, snap => {
+    const answered = snap.val() || {};
+    document.querySelectorAll('#admin-board .question-cell').forEach(cell => {
+      const key = `${cell.dataset.row}_${cell.dataset.col}`;
+      if (answered[key]) {
+        cell.classList.add('answered');
+        cell.classList.remove('active-question');
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+        cell.onclick = () => showAnsweredCell(row, col);
+      }
+    });
+  });
+  listeners.push(off);
+}
+
+function listenAdminBoard() {
+  const r = ref(db, `rooms/${roomCode}/board`);
+  const off = onValue(r, snap => {
+    if (snap.exists()) {
+      boardData = snap.val();
+      renderBoard('admin-board', true);
+      buildEditor();
+    }
+  });
+  listeners.push(off);
+}
+
+// ─── ADMIN: OPEN QUESTION ───
+function openQuestionAdminAt(row, col) {
+  const q = boardData.questions[row]?.[col];
+  if (!q) return;
+  currentAdminQuestion = { row, col };
+
+  document.getElementById('aq-category').textContent = boardData.categories[col];
+  document.getElementById('aq-points').textContent = POINTS[row] + ' Punkte';
+  document.getElementById('aq-text').innerHTML = renderSpoilerText(q.text, row, col, true);
+
+  const img = document.getElementById('aq-img');
+  if (q.image) { img.src = q.image; img.style.display = 'block'; }
+  else { img.style.display = 'none'; }
+
+  // Store answer for reveal
+  document.getElementById('aq-answer-text').textContent = q.answer || 'Keine Antwort hinterlegt';
+  const aqAnsImg = document.getElementById('aq-answer-img');
+  if (q.answerImage) { aqAnsImg.src = q.answerImage; aqAnsImg.style.display = 'block'; }
+  else { aqAnsImg.style.display = 'none'; }
+  document.getElementById('aq-answer-section').style.display = 'none';
+  document.getElementById('aq-reveal-btn').style.display = '';
+  document.getElementById('aq-status-tag').className = 'overlay-status-tag tag-open';
+  document.getElementById('aq-status-tag').textContent = '● Frage offen';
+
+  // Reset buzz indicator
+  document.getElementById('aq-buzz-indicator').textContent = '';
+  document.getElementById('aq-buzz-indicator').classList.remove('active');
+
+  document.getElementById('admin-question-overlay').classList.add('open');
+
+  // Highlight on admin board
+  document.querySelectorAll('#admin-board .question-cell').forEach(c => c.classList.remove('active-question'));
+  const cell = document.querySelector(`#admin-board .question-cell[data-row="${row}"][data-col="${col}"]`);
+  if (cell) cell.classList.add('active-question');
+
+  // Notify all players: open this question
+  update(ref(db, `rooms/${roomCode}`), {
+    activeQuestion: { row, col },
+    showAnswer: null
+  });
+
+  // Reset buzzer so everyone can buzz
+  set(ref(db, `rooms/${roomCode}/buzzer`), { active: false, winner: null, winnerName: '' });
+}
+
+// ─── ADMIN: REVEAL ANSWER ───
+window.revealAnswer = function() {
+  if (!currentAdminQuestion) return;
+  const { row, col } = currentAdminQuestion;
+
+  // Show answer in admin overlay
+  document.getElementById('aq-answer-section').style.display = '';
+  document.getElementById('aq-reveal-btn').style.display = 'none';
+  document.getElementById('aq-status-tag').className = 'overlay-status-tag tag-answer';
+  document.getElementById('aq-status-tag').textContent = '✓ Antwort aufgedeckt';
+
+  // Push to all players: show answer overlay
+  update(ref(db, `rooms/${roomCode}`), {
+    showAnswer: { row, col }
+  });
+};
+
+function closeAdminQuestion() {
+  document.getElementById('admin-question-overlay').classList.remove('open');
+  currentAdminQuestion = null;
+
+  // Clear active question for players
+  update(ref(db, `rooms/${roomCode}`), {
+    activeQuestion: null
+  });
+
+  document.querySelectorAll('#admin-board .question-cell').forEach(c => c.classList.remove('active-question'));
+}
+window.closeAdminQuestion = closeAdminQuestion;
+
+async function markAnswered() {
+  if (!currentAdminQuestion) return;
+  const { row, col } = currentAdminQuestion;
+  const key = `${row}_${col}`;
+  await update(ref(db, `rooms/${roomCode}/answered`), { [key]: true });
+
+  if (boardData.questions[row]?.[col]) boardData.questions[row][col].answered = true;
+
+  // Close admin overlay
+  document.getElementById('admin-question-overlay').classList.remove('open');
+  document.querySelectorAll('#admin-board .question-cell').forEach(c => c.classList.remove('active-question'));
+  currentAdminQuestion = null;
+
+  await clearBuzzer();
+
+  // Tell players to close their overlays (question + answer)
+  update(ref(db, `rooms/${roomCode}`), {
+    activeQuestion: null,
+    showAnswer: null,
+    closeOverlay: Date.now()   // timestamp forces re-trigger even if value was already null
+  });
+}
+window.markAnswered = markAnswered;
+
+// ─── ADMIN: POINTS ───
+async function awardPoints(correct) {
+  const buzSnap = await get(ref(db, `rooms/${roomCode}/buzzer`));
+  const buz = buzSnap.val();
+  if (!buz?.active || !buz.winner) return;
+
+  const pts = parseInt(document.getElementById('custom-points')?.value || (currentAdminQuestion ? POINTS[currentAdminQuestion.row] : 0));
+  const delta = correct ? pts : -pts;
+
+  const playerSnap = await get(ref(db, `rooms/${roomCode}/players/${buz.winner}`));
+  if (playerSnap.exists()) {
+    const current = playerSnap.val().score || 0;
+    await update(ref(db, `rooms/${roomCode}/players/${buz.winner}`), { score: current + delta });
+    showNotif(`${buz.winnerName}: ${delta > 0 ? '+' : ''}${delta} Punkte`);
+    spawnConfetti(correct ? '#22cc66' : '#ff4455');
+  }
+
+  if (correct) {
+    await markAnswered();
+  } else {
+    await clearBuzzer();
+  }
+}
+window.awardPoints = awardPoints;
+
+async function clearBuzzer() {
+  await set(ref(db, `rooms/${roomCode}/buzzer`), { active: false, winner: null, winnerName: '' });
+}
+window.clearBuzzer = clearBuzzer;
+
+async function resetBuzzer() {
+  await clearBuzzer();
+  showNotif('Buzzer freigegeben 🔓');
+}
+window.resetBuzzer = resetBuzzer;
+
+async function adjustScore(pid, delta) {
+  const snap = await get(ref(db, `rooms/${roomCode}/players/${pid}`));
+  if (snap.exists()) {
+    const cur = snap.val().score || 0;
+    await update(ref(db, `rooms/${roomCode}/players/${pid}`), { score: cur + delta });
+  }
+}
+window.adjustScore = adjustScore;
+
+async function resetGame() {
+  if (!confirm('Wirklich das komplette Spiel zurücksetzen? Alle Punkte und Fortschritte werden gelöscht.')) return;
+  await remove(ref(db, `rooms/${roomCode}/answered`));
+  await clearBuzzer();
+  await set(ref(db, `rooms/${roomCode}/board`), defaultBoard);
+  await update(ref(db, `rooms/${roomCode}`), { activeQuestion: null, showAnswer: null });
+  await remove(ref(db, `rooms/${roomCode}/spoilerReveals`));
+
+  const snap = await get(ref(db, `rooms/${roomCode}/players`));
+  if (snap.exists()) {
+    const updates = {};
+    Object.keys(snap.val()).forEach(pid => { updates[`${pid}/score`] = 0; });
+    await update(ref(db, `rooms/${roomCode}/players`), updates);
+  }
+  showNotif('Spiel zurückgesetzt!');
+}
+window.resetGame = resetGame;
+
+// ════════════════════════════════════════════
+// ─── EDITOR ───
+// ════════════════════════════════════════════
+const editorImages = {};
+
+function buildEditor() {
+  const grid = document.getElementById('editor-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const bd = boardData || defaultBoard;
+
+  // Category inputs
+  for (let col = 0; col < 5; col++) {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'editor-category-input';
+    inp.value = bd.categories[col] || '';
+    inp.placeholder = `Kategorie ${col+1}`;
+    inp.id = `cat_${col}`;
+    grid.appendChild(inp);
+  }
+
+  // Question cells
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 5; col++) {
+      const q = bd.questions[row]?.[col] || { text: '', answer: '', image: null };
+      const card = document.createElement('div');
+      card.className = 'editor-q-card';
+
+      const imgKey = `${row}_${col}`;
+      const ansImgKey = `ans_${row}_${col}`;
+      const hasImg = editorImages[imgKey] || q.image;
+      const hasAnsImg = editorImages[ansImgKey] || q.answerImage;
+
+      card.innerHTML = `
+        <div class="editor-points-label">${POINTS[row]}</div>
+        <span class="editor-field-label">Frage</span>
+        <div class="spoiler-editor-tools">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertSpoiler('q_${row}_${col}')">🔒 Spoiler</button>
+        </div>
+        <textarea id="q_${row}_${col}" placeholder="Frage...">${q.text || ''}</textarea>
+        <div style="display:flex; gap:0.35rem;">
+          <button type="button" class="btn btn-ghost btn-sm" style="flex:1; font-size:0.72rem; padding:0.35rem 0.5rem;"
+                  onclick="insertSpoiler(${row}, ${col})">🔒 Markierten Text als Spoiler</button>
+        </div>
+        <div class="spoiler-help">Text im Feld markieren und dann den Button drücken.</div>
+        <label class="img-upload-btn" id="img-label-${row}-${col}">
+          ${hasImg ? '🖼 Fragenbild ändern' : '+ Fragenbild hinzufügen'}
+          <input type="file" accept="image/*" onchange="handleImgUpload(event, ${row}, ${col}, false)">
+        </label>
+        ${hasImg ? `<img class="img-preview" id="img-prev-${row}-${col}" src="${editorImages[imgKey] || q.image}">` : `<div id="img-prev-${row}-${col}"></div>`}
+        <span class="editor-field-label" style="color:var(--success); margin-top:0.3rem;">Antwort</span>
+        <textarea id="a_${row}_${col}" class="editor-answer-input" placeholder="Antwort...">${q.answer || ''}</textarea>
+        <label class="img-upload-btn" id="ans-img-label-${row}-${col}" style="border-color:rgba(34,204,102,0.3); color:var(--success);">
+          ${hasAnsImg ? '🖼 Antwortbild ändern' : '+ Antwortbild hinzufügen'}
+          <input type="file" accept="image/*" onchange="handleImgUpload(event, ${row}, ${col}, true)">
+        </label>
+        ${hasAnsImg ? `<img class="img-preview" id="ans-img-prev-${row}-${col}" src="${editorImages[ansImgKey] || q.answerImage}">` : `<div id="ans-img-prev-${row}-${col}"></div>`}
+      `;
+      grid.appendChild(card);
+
+      if (q.image && !editorImages[imgKey]) editorImages[imgKey] = q.image;
+      if (q.answerImage && !editorImages[ansImgKey]) editorImages[ansImgKey] = q.answerImage;
+    }
+  }
+}
+
+window.loadEditorData = function() {
+  if (!confirm('Änderungen verwerfen?')) return;
+  buildEditor();
+};
+
+window.handleImgUpload = function(event, row, col, isAnswer) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 10485760) {
+    showNotif('Bild zu groß! Bitte unter 10 MB verwenden.', 4000);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const key = isAnswer ? `ans_${row}_${col}` : `${row}_${col}`;
+    const prevId = isAnswer ? `ans-img-prev-${row}-${col}` : `img-prev-${row}-${col}`;
+    const labelId = isAnswer ? `ans-img-label-${row}-${col}` : `img-label-${row}-${col}`;
+    const labelText = isAnswer ? '🖼 Antwortbild ändern' : '🖼 Fragenbild ändern';
+
+    editorImages[key] = e.target.result;
+    const prev = document.getElementById(prevId);
+    const label = document.getElementById(labelId);
+    if (prev) {
+      if (prev.tagName === 'IMG') {
+        prev.src = e.target.result;
+      } else {
+        const img = document.createElement('img');
+        img.className = 'img-preview';
+        img.src = e.target.result;
+        prev.replaceWith(img);
+        img.id = prevId;
+      }
+    }
+    if (label) label.childNodes[0].textContent = labelText;
+  };
+  reader.readAsDataURL(file);
+};
+
+async function saveEditorData() {
+  const categories = [];
+  for (let col = 0; col < 5; col++) {
+    categories.push(document.getElementById(`cat_${col}`)?.value?.trim() || `Kategorie ${col+1}`);
+  }
+
+  const questions = [];
+  for (let row = 0; row < 5; row++) {
+    questions.push([]);
+    for (let col = 0; col < 5; col++) {
+      const text = document.getElementById(`q_${row}_${col}`)?.value?.trim() || '';
+      const answer = document.getElementById(`a_${row}_${col}`)?.value?.trim() || '';
+      const image = editorImages[`${row}_${col}`] || null;
+      const answerImage = editorImages[`ans_${row}_${col}`] || null;
+      // Preserve answered state
+      const wasAnswered = boardData?.questions?.[row]?.[col]?.answered || false;
+      questions[row].push({ text, answer, image, answerImage, answered: wasAnswered });
+    }
+  }
+
+  const newBoard = { categories, questions };
+
+  // Save to Firebase — all players will see the update immediately via listenBoard
+  await set(ref(db, `rooms/${roomCode}/board`), newBoard);
+  boardData = newBoard;
+
+  showNotif('Board gespeichert & live für alle ✓');
+  adminTab('game');
+}
+window.saveEditorData = saveEditorData;
+
+// ─── CONFETTI ───
+function spawnConfetti(color) {
+  for (let i = 0; i < 20; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.background = [color, '#f5c518', '#ffffff'][Math.floor(Math.random()*3)];
+    el.style.animationDelay = Math.random() * 0.5 + 's';
+    el.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+  }
+}
+
+// Expose for debug
+window._state = () => ({ myId, myName, roomCode, myRole, boardData });
+</script>
+
+</body>
+</html>
